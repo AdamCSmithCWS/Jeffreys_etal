@@ -125,18 +125,20 @@ rt_names_counts <- strat_data$route_strat %>%
 
 # Link covariates and counts ----------------------------------------------
 
-# Load hsi data -------------------------------------------------------
+# Load habitat data -------------------------------------------------------
 
-hsi <- read.csv("data/MeanHSI_BBSRoute_yearly.csv")
+hslope_all <- read.csv("data/RegressionSlope_BBSRoute - reduceRegionsSlope.csv")
 
 
 
 # clean route names to separate names and numbers in canadian routes
 
+for(yy in c(1985,2000)){
 
+hslope <- hslope_all %>% 
+  filter(Trend == yy)
 
-
-hsi <- hsi %>% 
+hslope <- hslope %>% 
   mutate(RTENO_2 = ifelse(str_detect(RTENAME,"[[:digit:]]"),
                           str_extract_all(RTENAME,"[[:digit:]]{2}-[[:digit:]]{3}"),
                           RTENO),
@@ -147,26 +149,19 @@ hsi <- hsi %>%
                             RTENAME),
          rt.uni = paste0(as.integer(str_sub(RTENO_2,1,2)),
                          "-",
-                         as.integer(str_sub(RTENO_2,3,5))),
-         year = as.integer(str_sub(date,1,4))) 
+                         as.integer(str_sub(RTENO_2,3,5)))) 
 
 
-hab_vis <- ggplot(data = hsi,
-                  aes(x = year,y = meanHSI,
-                      group = rt.uni))+
-  geom_line(alpha = 0.2)
-
-hab_vis
 
 
 join_test1 <- rt_names_counts %>% 
   filter(statenum != 3) %>% 
-  left_join(.,hsi,
+  left_join(.,hslope,
             by = c("rt.uni","RouteName"))
 
 AK <- rt_names_counts %>% 
   filter(statenum == 3) %>% 
-  left_join(.,hsi,
+  left_join(.,hslope,
             by = "RouteName") %>% 
   select(-rt.uni.y) %>% 
   rename(rt.uni = rt.uni.x) 
@@ -175,38 +170,23 @@ join_test <- bind_rows(AK,join_test1)
 
 
 missing_habitat <- join_test %>% 
-  filter(is.na(meanHSI))
+  filter(is.na(meanhslope))
 
 write.csv(missing_habitat,
-          "routes_with_RUHU_data_missing_habitat.csv")
+          "routes_with_RUHU_data_missing_habitat_slope.csv")
 
-join_table <- join_test %>% 
-  filter(!is.na(meanHSI))
 
-hab_full <- join_table
-
-hab_vis <- ggplot(data = hab_full,
-                  aes(x = year,y = meanHSI,
-                      group = RouteName))+
-  geom_line(alpha = 0.2)+
-  geom_point(alpha = 0.1)+
-  geom_smooth(method = "lm",se = FALSE,
-              alpha = 0.2,
-              linewidth = 0.2)+
-  facet_wrap(vars(State))
-  
-hab_vis
 
 
 
 hab_full <- hab_full %>% 
-  mutate(hsi = meanHSI) %>% 
+  mutate(hslope = meanhslope) %>% 
   group_by(rt.uni) %>% 
-  mutate(centered_hsi_x2 = 2*(hsi - mean(hsi)),
-         mean_hsi = mean(hsi)) %>% 
+  mutate(centered_hslope_x2 = 2*(hslope - mean(hslope)),
+         mean_hslope = mean(hslope)) %>% 
   ungroup() %>% 
   rename(route = rt.uni) %>% 
-  select(route,year,centered_hsi_x2,mean_hsi)
+  select(route,year,centered_hslope_x2,mean_hslope)
 
 
 
@@ -310,33 +290,22 @@ dev.off()
 #   summarise(n = n())
 
 strat_mean_habitat <- new_data %>% 
-  select(routeF,route,mean_hsi) %>% 
+  select(routeF,route,mean_hslope) %>% 
   distinct() %>% 
   arrange(routeF)
 
 habitat_pred <- hab_full %>% 
   left_join(.,strat_mean_habitat,by = "route") %>% 
-  select(routeF,year,centered_hsi_x2) %>% 
-  pivot_wider(values_from = centered_hsi_x2,
+  select(routeF,year,centered_hslope_x2) %>% 
+  pivot_wider(values_from = centered_hslope_x2,
               names_from = year,
               id_cols = routeF,
               values_fill = 0) %>% 
   arrange(routeF) %>% 
   mutate()
 
-
-saveRDS(strat_mean_habitat,
-          "data/mean_hsi_route.rds")
-
-
-
-
-
-
-
-
 hab_vis <- ggplot(data = hab_full,
-                  aes(x = year,y = meanHSI,
+                  aes(x = year,y = meanhslope,
                       group = RouteName))+
   geom_line(alpha = 0.2)+
   facet_wrap(vars(State))
@@ -352,7 +321,7 @@ stan_data[["strat"]] <- new_data$strat
 stan_data[["route"]] <- new_data$routeF
 stan_data[["year"]] <- new_data$year
 stan_data[["firstyr"]] <- new_data$firstyr
-stan_data[["c_habitat"]] <- new_data$centered_hsi_x2
+stan_data[["c_habitat"]] <- new_data$centered_hslope_x2
 stan_data[["fixedyear"]] <- jags_data$fixedyear
 
 
@@ -366,7 +335,7 @@ stan_data[["N_edges"]] <- car_stan_dat$N_edges
 stan_data[["node1"]] <- car_stan_dat$node1
 stan_data[["node2"]] <- car_stan_dat$node2
 stan_data[["nroutes"]] <- max(stan_data$route)
-stan_data[["route_habitat"]] <- as.numeric(strat_mean_habitat$mean_hsi - mean(strat_mean_habitat$mean_hsi))
+stan_data[["route_habitat"]] <- as.numeric(strat_mean_habitat$mean_hslope - mean(strat_mean_habitat$mean_hslope))
 stan_data[["c_habitat_pred"]] <- as.matrix(habitat_pred)
   
   
