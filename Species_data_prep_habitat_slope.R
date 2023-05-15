@@ -132,7 +132,7 @@ hslope_all <- read.csv("data/RegressionSlope_BBSRoute - reduceRegionsSlope.csv")
 
 
 # clean route names to separate names and numbers in canadian routes
-
+slope_full <- NULL
 for(yy in c(1985,2000)){
 
 hslope <- hslope_all %>% 
@@ -170,23 +170,36 @@ join_test <- bind_rows(AK,join_test1)
 
 
 missing_habitat <- join_test %>% 
-  filter(is.na(meanhslope))
+  filter(is.na(meanslope))
 
 write.csv(missing_habitat,
           "routes_with_RUHU_data_missing_habitat_slope.csv")
 
 
+slope_full_t <- join_test %>% 
+  filter(!is.na(meanslope)) %>% 
+  mutate(scaled_habslope = meanslope*100,
+         start_year = yy) %>% 
+  select(rt.uni,scaled_habslope,start_year)
+
+slope_full <- bind_rows(slope_full,slope_full_t)
+
+}
+
+slope_join <- slope_full %>% 
+  pivot_wider(names_from = "start_year",
+              values_from = scaled_habslope,
+              names_prefix = "slope_") %>% 
+  rename(route = rt.uni)
+
+mean_hab <- readRDS("data/mean_hsi_route.rds") %>% 
+  select(-routeF)
 
 
-
-hab_full <- hab_full %>% 
-  mutate(hslope = meanhslope) %>% 
-  group_by(rt.uni) %>% 
-  mutate(centered_hslope_x2 = 2*(hslope - mean(hslope)),
-         mean_hslope = mean(hslope)) %>% 
-  ungroup() %>% 
-  rename(route = rt.uni) %>% 
-  select(route,year,centered_hslope_x2,mean_hslope)
+hab_full <- slope_join %>% 
+  inner_join(.,mean_hab,
+             by = c("route")) %>% 
+  drop_na()
 
 
 
@@ -198,8 +211,7 @@ test_dup <- new_data %>%
 
 new_data <- new_data %>% 
   inner_join(.,hab_full,
-             by = c("route",
-                    "r_year" = "year"))
+             by = c("route"))
 
 # Spatial neighbours set up --------------------
 
@@ -290,27 +302,10 @@ dev.off()
 #   summarise(n = n())
 
 strat_mean_habitat <- new_data %>% 
-  select(routeF,route,mean_hslope) %>% 
+  select(routeF,route,slope_1985,slope_2000,mean_hsi) %>% 
   distinct() %>% 
   arrange(routeF)
 
-habitat_pred <- hab_full %>% 
-  left_join(.,strat_mean_habitat,by = "route") %>% 
-  select(routeF,year,centered_hslope_x2) %>% 
-  pivot_wider(values_from = centered_hslope_x2,
-              names_from = year,
-              id_cols = routeF,
-              values_fill = 0) %>% 
-  arrange(routeF) %>% 
-  mutate()
-
-hab_vis <- ggplot(data = hab_full,
-                  aes(x = year,y = meanhslope,
-                      group = RouteName))+
-  geom_line(alpha = 0.2)+
-  facet_wrap(vars(State))
-
-hab_vis
 
 
 
@@ -321,7 +316,6 @@ stan_data[["strat"]] <- new_data$strat
 stan_data[["route"]] <- new_data$routeF
 stan_data[["year"]] <- new_data$year
 stan_data[["firstyr"]] <- new_data$firstyr
-stan_data[["c_habitat"]] <- new_data$centered_hslope_x2
 stan_data[["fixedyear"]] <- jags_data$fixedyear
 
 
@@ -335,9 +329,10 @@ stan_data[["N_edges"]] <- car_stan_dat$N_edges
 stan_data[["node1"]] <- car_stan_dat$node1
 stan_data[["node2"]] <- car_stan_dat$node2
 stan_data[["nroutes"]] <- max(stan_data$route)
-stan_data[["route_habitat"]] <- as.numeric(strat_mean_habitat$mean_hslope - mean(strat_mean_habitat$mean_hslope))
-stan_data[["c_habitat_pred"]] <- as.matrix(habitat_pred)
-  
+stan_data[["route_habitat"]] <- as.numeric(strat_mean_habitat$mean_hsi - mean(strat_mean_habitat$mean_hsi))
+stan_data[["route_habitat_slope_1985"]] <- as.numeric(strat_mean_habitat$slope_1985) 
+stan_data[["route_habitat_slope_2000"]] <- as.numeric(strat_mean_habitat$slope_2000) 
+
   
 
 if(car_stan_dat$N != stan_data[["nroutes"]]){stop("Some routes are missing from adjacency matrix")}
