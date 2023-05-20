@@ -3,6 +3,13 @@
 // random effect, stratum-level trends
 // and no random year-effects - slope only
 
+//iCAR function
+ functions {
+   real icar_normal_lpdf(vector bb, int ns, array[] int n1, array[] int n2) {
+     return -0.5 * dot_self(bb[n1] - bb[n2])
+       + normal_lpdf(sum(bb) | 0, 0.001 * ns); //soft sum to zero constraint on bb
+  }
+ }
 
 
 data {
@@ -22,6 +29,10 @@ data {
 
   int<lower=1> fixedyear; // centering value for years
  
+ // spatial neighbourhood information
+  int<lower=1> N_edges;
+  array [N_edges] int<lower=1, upper=nroutes> node1;  // node1[i] adjacent to node2[i]
+  array [N_edges] int<lower=1, upper=nroutes> node2;  // and node1[i] < node2[i]
 
 
 }
@@ -101,8 +112,10 @@ model {
   
   beta_raw ~ normal(0,1);//random slope effects
   sum(beta_raw) ~ normal(0,0.001*nroutes);
-  beta_raw_hab ~ normal(0,1);//habitat slope effects
-  sum(beta_raw_hab) ~ normal(0,0.001*nroutes);
+  
+  // spatially varying coefficient of habitat change on trend
+  beta_raw_hab ~ icar_normal(nroutes, node1, node2);//~ normal(0,1);//habitat slope effects
+  //sum(beta_raw_hab) ~ normal(0,0.001*nroutes);
   alpha_raw ~ normal(0,1);
   sum(alpha_raw) ~ normal(0,0.001*nroutes);
   alpha_raw_hab ~ normal(0,1);

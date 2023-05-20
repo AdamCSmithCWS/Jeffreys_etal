@@ -3,6 +3,13 @@
 // random effect, stratum-level trends
 // and no random year-effects - slope only
 
+//iCAR function
+ functions {
+   real icar_normal_lpdf(vector bb, int ns, array[] int n1, array[] int n2) {
+     return -0.5 * dot_self(bb[n1] - bb[n2])
+       + normal_lpdf(sum(bb) | 0, 0.001 * ns); //soft sum to zero constraint on bb
+  }
+ }
 
 
 data {
@@ -22,6 +29,10 @@ data {
 
   int<lower=1> fixedyear; // centering value for years
  
+ // spatial neighbourhood information
+  int<lower=1> N_edges;
+  array [N_edges] int<lower=1, upper=nroutes> node1;  // node1[i] adjacent to node2[i]
+  array [N_edges] int<lower=1, upper=nroutes> node2;  // and node1[i] < node2[i]
 
 
 }
@@ -34,7 +45,7 @@ parameters {
   real BETA_hab; 
 
   vector[nroutes] alpha_raw;
-  vector[nroutes] alpha_raw_hab;
+  //vector[nroutes] alpha_raw_hab;
   real ALPHA; 
   real ALPHA_hab; 
 
@@ -48,7 +59,7 @@ parameters {
  real<lower=0> sdbeta;    // sd of slopes 
  real<lower=0> sdbeta_hab;    // sd of slopes 
   real<lower=0> sdalpha;    // sd of intercepts
-  real<lower=0> sdalpha_hab;    // sd of intercepts
+  //real<lower=0> sdalpha_hab;    // sd of intercepts
 
   
 }
@@ -58,11 +69,11 @@ transformed parameters{
    vector[nroutes] beta;
    vector[nroutes] beta_trend;
    vector[nroutes] beta_hab;
-   vector[nroutes] beta_dif;
-   real BETA_dif;
+   //vector[nroutes] beta_dif;
+   //real BETA_dif;
    
   vector[nroutes] alpha;
-  vector[nroutes] alpha_hab;
+  //vector[nroutes] alpha_hab;
   vector[nobservers] obs;
   real phi;
   vector[ncounts] E;           // log_scale additive likelihood
@@ -73,15 +84,15 @@ transformed parameters{
    beta_trend = (sdbeta*beta_raw) + BETA;
    beta_hab = (sdbeta_hab*beta_raw_hab) + BETA_hab;
    
-   alpha_hab = (sdalpha_hab*alpha_raw_hab) + ALPHA_hab;
+   //alpha_hab = (sdalpha_hab*alpha_raw_hab) + ALPHA_hab;
    
    for(s in 1:nroutes){
-     alpha[s] = (sdalpha*alpha_raw[s]) + ALPHA  + (alpha_hab[s]*route_habitat[s]);
+     alpha[s] = (sdalpha*alpha_raw[s]) + ALPHA  + (ALPHA_hab*route_habitat[s]);
      beta[s] = beta_trend[s]  + (beta_hab[s]*route_habitat_slope[s]);
-     beta_dif[s] = beta[s]-beta_trend[s];
+     //beta_dif[s] = beta[s]-beta_trend[s];
    }
    
-   BETA_dif = mean(beta_dif);
+  // BETA_dif = mean(beta_dif);
  //  noise = sdnoise*noise_raw;
    obs = sdobs*obs_raw;
 
@@ -101,12 +112,14 @@ model {
   
   beta_raw ~ normal(0,1);//random slope effects
   sum(beta_raw) ~ normal(0,0.001*nroutes);
-  beta_raw_hab ~ normal(0,1);//habitat slope effects
-  sum(beta_raw_hab) ~ normal(0,0.001*nroutes);
+  
+  // spatially varying coefficient of habitat change on trend
+  beta_raw_hab ~ icar_normal(nroutes, node1, node2);//~ normal(0,1);//habitat slope effects
+  //sum(beta_raw_hab) ~ normal(0,0.001*nroutes);
   alpha_raw ~ normal(0,1);
   sum(alpha_raw) ~ normal(0,0.001*nroutes);
-  alpha_raw_hab ~ normal(0,1);
-  sum(alpha_raw_hab) ~ normal(0,0.001*nroutes);
+  // alpha_raw_hab ~ normal(0,1);
+  // sum(alpha_raw_hab) ~ normal(0,0.001*nroutes);
 
   
   sdnoise ~ normal(0,0.5); //prior on scale of extra Poisson log-normal variance
@@ -127,7 +140,7 @@ model {
   
   //spatial iCAR intercepts and slopes by strata
   sdalpha ~ normal(0,2); //prior on sd of intercept variation
-  sdalpha_hab ~ normal(0,2); //prior on sd of intercept variation
+  //sdalpha_hab ~ normal(0,2); //prior on sd of intercept variation
 
   sdbeta ~ normal(0,0.1);//~ normal(0,0.05); //boundary avoiding prior on sd of slope spatial variation w mean = 0.04 and 99% < 0.13
   sdbeta_hab ~ normal(0,0.1);//~ normal(0,0.05); //boundary avoiding prior on sd of slope spatial variation w mean = 0.04 and 99% < 0.13
@@ -145,6 +158,10 @@ model {
     array[nyears] real<lower=0> NSmooth_no_habitat;
     real T;
     real T_no_habitat;
+    real CH;
+    real CH_no_habitat;
+    real CH_dif;
+    real T_dif;
   real retrans_obs = 0.5*(sdobs^2);
 
 // intercepts and slopes
@@ -167,6 +184,15 @@ model {
     
     
     T_no_habitat = 100*(((NSmooth_no_habitat[nyears]/NSmooth_no_habitat[1])^(1.0/nyears))-1);
+    
+        CH = 100*((NSmooth[nyears]/NSmooth[1])-1);
+    
+    
+    CH_no_habitat = 100*((NSmooth_no_habitat[nyears]/NSmooth_no_habitat[1])-1);
+    
+    CH_dif = CH-CH_no_habitat;
+    T_dif = T-T_no_habitat;
+    
   }
 
 

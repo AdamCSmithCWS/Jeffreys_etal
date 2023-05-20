@@ -12,17 +12,17 @@ library(cmdstanr)
 output_dir <- "output"
 
 
-for(firstYear in c(1985,2000)){
+for(firstYear in c(1985,2006)){
   
-lastYear <- 2021
-
+  lastYear <- ifelse(firstYear == 1985,2005,2021)
+  
 
 species <- "Rufous Hummingbird" 
 
   
 species_f <- gsub(gsub(species,pattern = " ",replacement = "_",fixed = T),pattern = "'",replacement = "",fixed = T)
 
-for(spp1 in c("habitat_predict_slope","nonhabitat")){#},"iCAR")){
+for(spp1 in c("habitat_predict_slope","habitat_predict_slope_spatial")[2]){#},"iCAR")){
 
 
   spp <- paste0("_",spp1,"_")
@@ -44,8 +44,8 @@ if(spp1 == "nonspatial"){
   stan_data[["N_edges"]] <- NULL
   stan_data[["node1"]] <- NULL
   stan_data[["node2"]] <- NULL
-  stan_data[["c_habitat_pred"]] <- NULL
-  stan_data[["c_habitat"]] <- NULL
+
+  stan_data[["route_habitat_slope"]] <- NULL
   
 }
 
@@ -55,20 +55,9 @@ if(spp1 == "habitat_predict_slope"){
   stan_data[["node1"]] <- NULL
   stan_data[["node2"]] <- NULL
   
+ 
 }
 
-if(firstYear == 1985){
-  
-  stan_data[["route_habitat_slope_2000"]] <- NULL
-  stan_data[["route_habitat_slope"]] <-   stan_data[["route_habitat_slope_1985"]]
-  stan_data[["route_habitat_slope_1985"]] <- NULL
-  
-}else{
-  stan_data[["route_habitat_slope_1985"]] <- NULL
-  stan_data[["route_habitat_slope"]] <-   stan_data[["route_habitat_slope_2000"]]
-  stan_data[["route_habitat_slope_2000"]] <- NULL
-  
-}
 
 
 

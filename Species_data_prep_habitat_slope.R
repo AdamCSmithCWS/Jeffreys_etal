@@ -316,7 +316,7 @@ stan_data[["strat"]] <- new_data$strat
 stan_data[["route"]] <- new_data$routeF
 stan_data[["year"]] <- new_data$year
 stan_data[["firstyr"]] <- new_data$firstyr
-stan_data[["fixedyear"]] <- jags_data$fixedyear
+stan_data[["fixedyear"]] <- 1
 
 
 stan_data[["nyears"]] <- max(new_data$year)
@@ -343,7 +343,6 @@ save(list = c("stan_data",
               "new_data",
               "route_map",
               "realized_strata_map",
-              "firstYear",
               "car_stan_dat",
               "dist_matrix_km",
               "strat_mean_habitat",

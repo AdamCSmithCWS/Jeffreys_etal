@@ -3,6 +3,7 @@ setwd("C:/Users/SmithAC/Documents/GitHub/Jefferys_etal")
 library(bbsBayes)
 library(tidyverse)
 library(cmdstanr)
+library(patchwork)
 source("functions/neighbours_define_voronoi.R") ## function to define neighbourhood relationships for spatial model comparison
 source("functions/prepare-data-alt.R") ## small alteration of the bbsBayes function
 ## above source() call over-writes the bbsBayes prepare_data() function
@@ -19,13 +20,17 @@ output_dir <- "output"
 strat = "bbs_usgs"
 model = "slope"
 
-
-firstYear <- 1985
-lastYear <- 2021
-
-
-
 strat_data <- bbsBayes::stratify(by = strat)
+
+
+
+for(firstYear in c(1985,2006)){
+  
+  
+lastYear <- ifelse(firstYear == 1985,2005,2021)
+
+
+
 
 spp <- "_base_"
 
@@ -151,12 +156,12 @@ hsi <- hsi %>%
          year = as.integer(str_sub(date,1,4))) 
 
 
-hab_vis <- ggplot(data = hsi,
-                  aes(x = year,y = meanHSI,
-                      group = rt.uni))+
-  geom_line(alpha = 0.2)
-
-hab_vis
+# hab_vis <- ggplot(data = hsi,
+#                   aes(x = year,y = meanHSI,
+#                       group = rt.uni))+
+#   geom_line(alpha = 0.2)
+# 
+# hab_vis
 
 
 join_test1 <- rt_names_counts %>% 
@@ -178,43 +183,37 @@ missing_habitat <- join_test %>%
   filter(is.na(meanHSI))
 
 write.csv(missing_habitat,
-          "routes_with_RUHU_data_missing_habitat.csv")
+          paste0("routes_with_RUHU_data_missing_habitat",firstYear,".csv"))
 
 join_table <- join_test %>% 
   filter(!is.na(meanHSI))
 
 hab_full <- join_table
 
-hab_vis <- ggplot(data = hab_full,
-                  aes(x = year,y = meanHSI,
-                      group = RouteName))+
-  geom_line(alpha = 0.2)+
-  geom_point(alpha = 0.1)+
-  geom_smooth(method = "lm",se = FALSE,
-              alpha = 0.2,
-              linewidth = 0.2)+
-  facet_wrap(vars(State))
-  
-hab_vis
+# hab_vis <- ggplot(data = hab_full,
+#                   aes(x = year,y = meanHSI,
+#                       group = RouteName))+
+#   geom_line(alpha = 0.2)+
+#   geom_point(alpha = 0.1)+
+#   geom_smooth(method = "lm",se = FALSE,
+#               alpha = 0.2,
+#               linewidth = 0.2)+
+#   facet_wrap(vars(State))
+#   
+# hab_vis
 
 
 
 hab_full <- hab_full %>% 
-  mutate(hsi = meanHSI) %>% 
-  group_by(rt.uni) %>% 
-  mutate(centered_hsi_x2 = 2*(hsi - mean(hsi)),
-         mean_hsi = mean(hsi)) %>% 
-  ungroup() %>% 
   rename(route = rt.uni) %>% 
-  select(route,year,centered_hsi_x2,mean_hsi)
+  select(route,year,meanHSI) %>% 
+  filter(year >= firstYear)
+
 
 
 
 
 # Drop count data with no habitat -----------------------------------------
-test_dup <- new_data %>% 
-  select(route,r_year) %>% 
-  distinct()
 
 new_data <- new_data %>% 
   inner_join(.,hab_full,
@@ -300,40 +299,43 @@ print(car_stan_dat$map)
 dev.off()
 
 
-# set up cross-validation folds -------------------------------------------
+# habitat predictor data -------------------------------------------
 
-# new_data$folds <- cv_folds(new_data,
-#                   fold_groups = "routeF")
-# 
-# check_folds <- new_data %>% 
-#   group_by(routeF,ObsN,folds) %>% 
-#   summarise(n = n())
+route_df <- route_map %>% 
+  sf::st_drop_geometry(route_map)
 
-strat_mean_habitat <- new_data %>% 
-  select(routeF,route,mean_hsi) %>% 
-  distinct() %>% 
+
+sl <- function(y,x){
+  t <- lm(y~x)
+  cc <- coefficients(t)[["x"]]
+  return(cc)
+}
+slope_full <- NULL
+ 
+  
+  hab_route_mean_t <- hab_full %>% 
+    filter(year < (firstYear + 10)) %>%  #first 10 years
+    group_by(route) %>% 
+    summarise(mean_hsi_f6 = mean(meanHSI,na.rm = T))
+
+  hab_route_slope_t <- hab_full %>% 
+    arrange(year,route) %>% 
+    group_by(route) %>% 
+    summarise(slope_hsi = sl(meanHSI,year))
+
+  hab_tmp <- inner_join(hab_route_mean_t,hab_route_slope_t,
+                        by = "route") %>% 
+    mutate(startYear = firstYear)
+  
+  slope_full <- bind_rows(slope_full,hab_tmp)
+    
+
+
+slope_full <- slope_full %>% 
+  left_join(.,route_df,
+            by = "route") %>% 
   arrange(routeF)
-
-habitat_pred <- hab_full %>% 
-  left_join(.,strat_mean_habitat,by = "route") %>% 
-  filter(year < 1995) %>% 
-  select(routeF,year,centered_hsi_x2) %>% 
-  pivot_wider(values_from = centered_hsi_x2,
-              names_from = year,
-              id_cols = routeF,
-              values_fill = 0) %>% 
-  arrange(routeF) %>% 
-  mutate()
-
-
-saveRDS(strat_mean_habitat,
-          "data/mean_hsi_route.rds")
-
-
-
-
-
-
+  
 
 
 
@@ -344,7 +346,6 @@ stan_data[["strat"]] <- new_data$strat
 stan_data[["route"]] <- new_data$routeF
 stan_data[["year"]] <- new_data$year
 stan_data[["firstyr"]] <- new_data$firstyr
-stan_data[["c_habitat"]] <- new_data$centered_hsi_x2
 stan_data[["fixedyear"]] <- jags_data$fixedyear
 
 
@@ -358,10 +359,9 @@ stan_data[["N_edges"]] <- car_stan_dat$N_edges
 stan_data[["node1"]] <- car_stan_dat$node1
 stan_data[["node2"]] <- car_stan_dat$node2
 stan_data[["nroutes"]] <- max(stan_data$route)
-stan_data[["route_habitat"]] <- as.numeric(strat_mean_habitat$mean_hsi - mean(strat_mean_habitat$mean_hsi))
-stan_data[["c_habitat_pred"]] <- as.matrix(habitat_pred)
-  
-  
+stan_data[["route_habitat"]] <- as.numeric(slope_full$mean_hsi_f6 - mean(slope_full$mean_hsi_f6))
+stan_data[["route_habitat_slope"]] <- 100*(slope_full$slope_hsi - mean(slope_full$slope_hsi))
+ 
 
 if(car_stan_dat$N != stan_data[["nroutes"]]){stop("Some routes are missing from adjacency matrix")}
 
@@ -373,11 +373,67 @@ save(list = c("stan_data",
               "realized_strata_map",
               "car_stan_dat",
               "dist_matrix_km",
-              "strat_mean_habitat",
-              "hab_full"),
+              "hab_full",
+              "slope_full"),
      file = sp_data_file)
 
 
+mean_obs <- new_data %>% 
+  filter(r_year < firstYear+15) %>% 
+  group_by(route) %>% 
+  summarise(mean_obs = mean(count,na.rm = TRUE),
+            .groups = "keep")
 
+mean_obs2 <- new_data %>% 
+  filter(r_year > lastYear-15) %>% 
+  group_by(route) %>% 
+  summarise(mean_obs_end = mean(count,na.rm = TRUE),
+            .groups = "keep")
+
+mean_obs <- mean_obs %>% 
+  full_join(.,mean_obs2,
+            by = "route") %>% 
+  mutate(dif_mean_obs = log(mean_obs_end+0.1)-log(mean_obs+0.1))
+  
+rt_sums <- slope_full %>% 
+  left_join(.,mean_obs,
+            by = "route") 
+
+map_df <- route_map %>% 
+  left_join(rt_sums,by = c("route"))
+
+
+t1 <- ggplot(data = map_df)+
+  geom_sf(aes(colour = slope_hsi,
+              size = mean_obs))+
+  colorspace::scale_colour_continuous_diverging(mid = 0,
+                                                rev = TRUE)+
+  labs(title = paste("HSI trend by mean counts in",firstYear))+
+  theme_bw()
+
+t2 <- ggplot(data = map_df)+
+  geom_sf(aes(colour = dif_mean_obs,
+              size = mean_obs))+
+  colorspace::scale_colour_continuous_diverging(mid = 0,
+                                                rev = TRUE)+
+  labs(title = paste("Dif in obs by mean counts in",firstYear))+
+  theme_bw()
+
+t3 <- ggplot(data = map_df)+
+  geom_sf(aes(colour = slope_hsi,
+              size = mean_obs_end))+
+  colorspace::scale_colour_continuous_diverging(mid = 0,
+                                                rev = TRUE)+
+  labs(title = paste("HSI trend by mean counts in",lastYear))+
+  theme_bw()
+
+
+pdf(paste0("Figures/HSI_trend_by_obs_counts_",firstYear,".pdf"),
+    width = 11,height = 8.5)
+print(t1 + t2 + t3)
+dev.off()
+
+
+}
 
 
