@@ -1,8 +1,8 @@
 ## Fitting the BYM model to 1995 - 2021 BBS data
 ## script currently written to fit the model then save the Stan output to a directory
 ## 
-#setwd("C:/GitHub/iCAR_route_2021")
-setwd("C:/Users/SmithAC/Documents/GitHub/Jefferys_etal")
+setwd("C:/GitHub/Jeffreys_etal")
+#setwd("C:/Users/SmithAC/Documents/GitHub/Jefferys_etal")
 library(tidyverse)
 library(cmdstanr)
 
@@ -22,7 +22,7 @@ species <- "Rufous Hummingbird"
   
 species_f <- gsub(gsub(species,pattern = " ",replacement = "_",fixed = T),pattern = "'",replacement = "",fixed = T)
 
-for(spp1 in c("habitat_predict_slope","habitat_predict_slope_spatial")[2]){#},"iCAR")){
+for(spp1 in c("nonspatial","habitat_predict_slope_spatial")){#},"iCAR")){
 
 
   spp <- paste0("_",spp1,"_")
@@ -46,7 +46,7 @@ if(spp1 == "nonspatial"){
   stan_data[["node2"]] <- NULL
 
   stan_data[["route_habitat_slope"]] <- NULL
-  
+  stan_data[["route_habitat"]] <- NULL
 }
 
 if(spp1 == "habitat_predict_slope"){

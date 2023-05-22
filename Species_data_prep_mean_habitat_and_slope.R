@@ -167,12 +167,14 @@ hsi <- hsi %>%
 join_test1 <- rt_names_counts %>% 
   filter(statenum != 3) %>% 
   left_join(.,hsi,
-            by = c("rt.uni","RouteName"))
+            by = c("rt.uni","RouteName"),
+            multiple = "all")
 
 AK <- rt_names_counts %>% 
   filter(statenum == 3) %>% 
   left_join(.,hsi,
-            by = "RouteName") %>% 
+            by = "RouteName",
+            multiple = "all") %>% 
   select(-rt.uni.y) %>% 
   rename(rt.uni = rt.uni.x) 
 
@@ -199,7 +201,7 @@ hab_full <- join_table
 #               alpha = 0.2,
 #               linewidth = 0.2)+
 #   facet_wrap(vars(State))
-#   
+# 
 # hab_vis
 
 
@@ -220,6 +222,17 @@ new_data <- new_data %>%
              by = c("route",
                     "r_year" = "year"))
 
+# hab_vis <- ggplot(data = new_data,
+#                   aes(x = r_year,y = meanHSI,
+#                       group = route))+
+#   geom_line(alpha = 0.2)+
+#   geom_point(alpha = 0.1)+
+#   geom_smooth(method = "lm",se = FALSE,
+#               alpha = 0.2,
+#               linewidth = 0.2)+
+#   facet_wrap(vars(strat_name))
+# 
+# hab_vis
 # Spatial neighbours set up --------------------
 
 
@@ -314,7 +327,7 @@ slope_full <- NULL
  
   
   hab_route_mean_t <- hab_full %>% 
-    filter(year < (firstYear + 10)) %>%  #first 10 years
+    #filter(year < (firstYear + 10)) %>%  #first 10 years
     group_by(route) %>% 
     summarise(mean_hsi_f6 = mean(meanHSI,na.rm = T))
 
@@ -384,16 +397,7 @@ mean_obs <- new_data %>%
   summarise(mean_obs = mean(count,na.rm = TRUE),
             .groups = "keep")
 
-mean_obs2 <- new_data %>% 
-  filter(r_year > lastYear-15) %>% 
-  group_by(route) %>% 
-  summarise(mean_obs_end = mean(count,na.rm = TRUE),
-            .groups = "keep")
 
-mean_obs <- mean_obs %>% 
-  full_join(.,mean_obs2,
-            by = "route") %>% 
-  mutate(dif_mean_obs = log(mean_obs_end+0.1)-log(mean_obs+0.1))
   
 rt_sums <- slope_full %>% 
   left_join(.,mean_obs,
@@ -408,29 +412,14 @@ t1 <- ggplot(data = map_df)+
               size = mean_obs))+
   colorspace::scale_colour_continuous_diverging(mid = 0,
                                                 rev = TRUE)+
-  labs(title = paste("HSI trend by mean counts in",firstYear))+
+  labs(title = paste0("HSI trend ",firstYear,"-",lastYear,"\n by mean counts in ",firstYear))+
   theme_bw()
 
-t2 <- ggplot(data = map_df)+
-  geom_sf(aes(colour = dif_mean_obs,
-              size = mean_obs))+
-  colorspace::scale_colour_continuous_diverging(mid = 0,
-                                                rev = TRUE)+
-  labs(title = paste("Dif in obs by mean counts in",firstYear))+
-  theme_bw()
-
-t3 <- ggplot(data = map_df)+
-  geom_sf(aes(colour = slope_hsi,
-              size = mean_obs_end))+
-  colorspace::scale_colour_continuous_diverging(mid = 0,
-                                                rev = TRUE)+
-  labs(title = paste("HSI trend by mean counts in",lastYear))+
-  theme_bw()
 
 
 pdf(paste0("Figures/HSI_trend_by_obs_counts_",firstYear,".pdf"),
-    width = 11,height = 8.5)
-print(t1 + t2 + t3)
+    width = 8,height = 8)
+print(t1)
 dev.off()
 
 

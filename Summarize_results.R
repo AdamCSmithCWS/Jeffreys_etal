@@ -32,7 +32,7 @@ load(sp_data_file)
 
 
   
-for(spp1 in c("habitat_predict_slope","habitat_predict_slope_spatial")[2]){
+for(spp1 in c("nonspatial","habitat_predict_slope_spatial")){
   
   
   spp <- paste0("_",spp1,"_")
@@ -66,6 +66,8 @@ route_map_1985 <- route_map
 }else{
 route_map_2006 <- route_map 
 }
+
+
 
 
 
@@ -111,8 +113,7 @@ alphas <- summ %>%
   filter(grepl("alpha[",
                variable,
                fixed = TRUE),
-         model == mod_sel,
-         first_year == year_sel) %>% 
+         model == mod_sel) %>% 
   mutate(routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}")))
 
 
@@ -121,8 +122,7 @@ alpha_habs <- summ %>%
   filter(grepl("alpha_hab[",
                variable,
                fixed = TRUE),
-         model == mod_sel,
-         first_year == year_sel) %>% 
+         model == mod_sel) %>% 
   mutate(routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}")))
 
 BETA_habs <- summ %>% 
@@ -326,7 +326,7 @@ t_map2 <- route_map_2006 %>%
   
   
   plot_map2 <- route_map_2006 %>% 
-    left_join(.,betas1,
+    left_join(.,betas2,
               by = "routeF") 
   
   breaks <- c(-7, -4, -2, -1, -0.5, 0.5, 1, 2, 4, 7)
@@ -357,6 +357,7 @@ t_map2 <- route_map_2006 %>%
                         name = paste0(lgnd_head))+
     coord_sf(xlim = xlms,ylim = ylms)+
     theme_bw()+
+    theme(legend.position = "none")+
     labs(title = paste(2006,"-",2021))
   
   # pdf(paste0("Figures/Four_trends_model_comparison_",species_f,".pdf"),
@@ -380,15 +381,25 @@ t_map2 <- route_map_2006 %>%
                            name = paste0("SE of Trend"))+
     coord_sf(xlim = xlms,ylim = ylms)+
     theme_bw()+
+    theme(legend.position = "none")+
     labs(title = paste(2006,"-",2021))
   
   
   #print(map2 / map_se2)
   
+  pdf(paste0("Figures/Trend_map_two_time_periods_",species_f,".pdf"),
+  height = 10.5,
+  width = 7.5)
+
+
   print(map + map2 + map_se + map_se2 + plot_layout(design = c("
                                                                12
                                                                34"),
                                                     guides = "collect"))
   
+  print(map + map2 + t_plot1 + t_plot2 + plot_layout(design = c("
+                                                               12
+                                                               34")))
   
+  dev.off()
   
