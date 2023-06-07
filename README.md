@@ -1,4 +1,4 @@
-# Jeffreys_etal
+# Jefferys_etal
 covariates on trends for Rufous Hummingbird
 
 This repo holds the code and data necessary to replicate the BBS component of Jeffreys et al. Detecting Rufous Hummingbird habitat change.
