@@ -1,7 +1,6 @@
 // This is a Stan implementation of a route-level slope model
 // plus, it has an explicitly spatial prior structure on the 
-// random effect, stratum-level trends
-// and no random year-effects - slope only
+// random effect, and covariates on the intercepts and trends
 
 //iCAR function
  functions {
