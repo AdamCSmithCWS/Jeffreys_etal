@@ -74,6 +74,7 @@ transformed parameters{
    
   vector[nroutes] alpha;
   vector[nroutes] alpha_hab;
+  vector[nroutes] alpha_resid;
   vector[nobservers] obs;
   real phi;
   vector[ncounts] E;           // log_scale additive likelihood
@@ -85,9 +86,9 @@ transformed parameters{
    beta_hab = (sdbeta_hab*beta_raw_hab) + BETA_hab;
    
    alpha_hab = (sdalpha_hab*alpha_raw_hab) + ALPHA_hab;
-   
+   alpha_resid = (sdalpha*alpha_raw) + ALPHA;
    for(s in 1:nroutes){
-     alpha[s] = (sdalpha*alpha_raw[s]) + ALPHA  + (alpha_hab[s]*route_habitat[s]);
+     alpha[s] =  alpha_resid[s] + (alpha_hab[s]*route_habitat[s]);
      beta[s] = beta_trend[s]  + (beta_hab[s]*route_habitat_slope[s]);
    }
    
