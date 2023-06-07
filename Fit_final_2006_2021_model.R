@@ -39,9 +39,16 @@ sp_data_file <- paste0("Data/",species_f,"_",firstYear,"_",lastYear,"_stan_data.
 
 load(sp_data_file)
 
+## for both time-periods, there is a relatively strong spatial autocorrelation
+## in both the habitat suitability and the mean abundance of the species
+## Since, the spatial component of habitat suitability could reasonably be
+## considered as a cause of the spatial dependency in abundance we estimated the
+## residual component of the intercept term with a non-spatial (simple random effect)
+## Setting this `spatial_intercept` to TRUE will fit the model with the spatial residual term
+spatial_intercept <- FALSE
 # trend habitat effects are not changed, but the intercept effect is
-# removes the optional spatial components for intercepts in 1985-2005
-stan_data[["fit_spatial"]] <- 0# ifelse(firstYear == 1985,0,1)
+# removes the optional spatial components for intercepts 
+stan_data[["fit_spatial"]] <- ifelse(spatial_intercept,1,0)
 
    mod.file = paste0("models/slope",spp,"route_NB.stan")
 
@@ -504,13 +511,11 @@ route_params_out <- bind_rows(route_params_out,alphahabs)
 
 Bhabs <- summ %>% 
   filter(grepl("BETA_hab",variable,fixed = TRUE)) %>% 
-  mutate(across(2:7,~exp_t(.x)),
-         firstyear = firstYear,
+  mutate(firstyear = firstYear,
          parameter = "Rho_beta")
 Ahabs <- summ %>% 
   filter(grepl("ALPHA_hab",variable,fixed = TRUE)) %>% 
-  mutate(across(2:7,~exp(.x)),
-         firstyear = firstYear,
+  mutate(firstyear = firstYear,
          parameter = "Rho_alpha")
 CH <- summ %>% 
   filter(variable == "CH") %>% 

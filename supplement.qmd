@@ -58,15 +58,19 @@ $$
 
 We estimated the effect of mean habitat suitability on the route-level intercept as a simple product of a route-specific coefficient ($\rho_{\alpha{_r}}$) and the average of the annual habitat suitabilities in a buffer surrounding each route-path ($\alpha_r^{\prime\prime}=\rho_{\alpha{_r}}*\mu_{habitat suitability_{r}}$). We estimated the effect of the rate of change in habitat suitability over time on the route-level slope as a product of a route-specific coefficient ($\rho_{\beta{_r}}$) and an estimate of the average rate of change in habitat suitability on each route ($\delta_{habitat suitability_{r}}$), calculated using a simple linear regression through the annual estimates of habitat suitability in a buffer surrounding each route-path ($\beta_r^{\prime\prime}=\rho_{\beta{_r}}*\delta_{habitat suitability}$). The habitat suitability predictors were standardized (both centered and scaled) to improve convergence. The route-specific coefficients for the effects of habitat suitablility on the intercept and slope were allowed to vary among routes, but were centered on a hyperparameter mean effects across routes $\rho_{\alpha{_r}} \sim Normal\left(P_{\alpha},\sigma_{\rho_{\alpha}}\right)$ and $\rho_{\beta{_r}} \sim Normal\left(P_{\beta},\sigma_{\rho_{\beta}}\right)$. As such, the hyperparameters for the effect of mean habitat suitability on the intercept ($P_{\alpha}$) and the effect of change in habitat suitablility on slope ($P_{\beta}$), represent a clear species-level estimate of the overall effects of habitat on abundance and trend, after adjusting for the species mean abundance and trend, as well as the residual spatially dependent variation in abundance and trend.
 
-We estimated the spatially varying component of the intercepts and slopes using an intrinsic iCAR structure, where the parameter for route-r is drawn from a normal distribution, centered on the mean of that parameter's values in all neighbouring routes, with an estimated standard deviation that is proportional to the inverse of the number of neighbours for that route [@morris2019]. Specifically, the component of the intercept that represents the residual spatially dependent relative abundance ($\alpha_r^{\prime\prime\prime}$) was drawn from a normal distribution centered on the mean of the intercepts for all neighbouring routes.
+In the fully spatial implementation of the model, we estimated the residual component of the intercepts and slopes using an intrinsic iCAR structure, where the parameter for route-r is drawn from a normal distribution, centered on the mean of that parameter's values in all neighbouring routes, with an estimated standard deviation that is proportional to the inverse of the number of neighbours for that route [@morris2019]. Specifically, the component of the intercept that represents the residual spatially dependent relative abundance ($\alpha_r^{\prime\prime\prime}$) was drawn from a normal distribution centered on the mean of the intercepts for all neighbouring routes.
 
 $$
 \alpha_r^{\prime\prime\prime} \sim Normal\left(\frac{\sum_{n{\in N}_r}\alpha_n^{\prime\prime\prime}}{N_r},\frac{\sigma_{\alpha^{\prime\prime\prime}}}{N_r}\right)
 $$
 
-The spatially varying component of the slope ($\beta_r$) were estimated similarly as random route-level terms from a normal distribution centered on the mean of the slopes for all neighbouring routes using the same iCAR structure. $$
+The spatially varying component of the slope ($\beta_r{\prime\prime\prime}$) was estimated similarly as random route-level terms from a normal distribution centered on the mean of the slopes for all neighbouring routes using the same iCAR structure. $$
 \beta_r^{\prime\prime\prime}\sim Normal\left(\frac{\sum_{n{\in N}_r}\beta_n^{\prime\prime\prime}}{N_r},\frac{\sigma_{\beta^{\prime\prime\prime}}}{N_r}\right)
 $$
+
+### Alternative non-spatial residual term on intercepts
+
+For both time-periods, there was a relatively strong spatial autocorrelation in both the habitat suitability and the mean abundance of the species. Since the spatial component of habitat suitability could reasonably be considered as a cause of the spatial dependency in abundance, we drew our final inference on the effect of habitat suitability on abundance from a model that estimated the residual component of the intercept term with a non-spatial varying effect (i.e., a simple random effect). Specifically, the component of the intercept that represents the residual relative abundance ($\alpha_r^{\prime\prime\prime}$) was drawn from a normal distribution centered at zero with an estimated standard deviation ($\alpha_r^{\prime\prime\prime} \sim Normal(0,\sigma_{\alpha^{\prime\prime\prime}})$).
 
 ## Spatial components
 
@@ -126,7 +130,7 @@ chtotal <- paste0(chtotal["mean"],"% ","[",chtotal["q5"],
 
 ```
 
-During the first 20 years from 1985-2005, the species overall population was generally stable. The model estimated an overall change in the population of approximately `r paste(chtotal)`. Trends varied among routes and regions (Figure 1). The effect of habitat on mean relative abundance was strong and positive ($P_{\alpha_{r}}$ = `r paste(hab_eff)`), if the residual trend was modeled without the spatial-dependency. However, when the spatial dependency was included, most of the variation in the relative abundance was allocated to the spatial component. There was a positive effect of change in the habitat suitability on trends, such that routes with habitat-loss had more negative population trends. However, this effect was somewhat uncertain $P_{\beta_{r}}$ = `r paste(hab_slope)`, and 0 was included within the 95% posterior credible interval.
+During the first 20 years from 1985-2005, the species overall population was generally stable. The model estimated an overall change in the population of approximately `r paste(chtotal)`. Trends varied among routes and regions (Figure 1). The effect of habitat on mean relative abundance was strong and positive ($P_{\alpha}$ = `r paste(hab_eff)`), if the residual trend was modeled without the spatial-dependency. However, when the spatial dependency was included, most of the variation in the relative abundance was allocated to the spatial component. There was a positive effect of change in the habitat suitability on trends, such that routes with habitat-loss had more negative population trends. However, this effect was somewhat uncertain $P_{\beta}$ = `r paste(hab_slope)`, and 0 was included within the 95% posterior credible interval.
 
 ```{r out.height="100%"}
 #| include: true
@@ -136,6 +140,7 @@ map_save <- readRDS(paste0("Figures/saved_map_",firstYear,".rds"))
 print(map_save)
 
 ```
+
 \newpage
 
 ### 2006-2021
@@ -176,7 +181,7 @@ chtotal <- paste0(chtotal["mean"],"% ","[",chtotal["q5"],
 
 ```
 
-During the later 15 years from 2006-2021, the species overall population declined steeply. The model estimated an overall change in the population of approximately `r chtotal`. Trends were negative across the species' range, but most negative in the coastal regions where the species is also most abundant (Figure 2). The effect of habitat suitability on mean relative abundance was strong and positive ( $P_{\alpha_{r}}$ = `r hab_eff`), and this effect was robust, whether the residual abundance component was spatially autocorrellated or random. There was a clear positive effect of change in the habitat suitability on trends, such that routes with habitat-loss had more negative population trends $P_{\beta_{r}}$ = `r hab_slope`. The greater loss of habitat in the coastal region accounts for most of the increased rates of decline in that region (Figure 2), the residual trend component alone (Figure 2, right panel) does not show the same coastal-decline pattern.
+During the later 15 years from 2006-2021, the species overall population declined steeply. The model estimated an overall change in the population of approximately `r chtotal`. Trends were negative across the species' range, but most negative in the coastal regions where the species is also most abundant (Figure 2). The effect of habitat suitability on mean relative abundance was strong and positive ( $P_{\alpha}$ = `r hab_eff`), and this effect was robust, whether the residual abundance component was spatially autocorrellated or random. There was a clear positive effect of change in the habitat suitability on trends, such that routes with habitat-loss had more negative population trends $P_{\beta}$ = `r hab_slope`. The greater loss of habitat in the coastal region accounts for most of the increased rates of decline in that region (Figure 2), the residual trend component alone (Figure 2, right panel) does not show the same coastal-decline pattern.
 
 ```{r out.height="100%"}
 #| include: true
@@ -187,10 +192,6 @@ print(map_save)
 
 ```
 
-
-
 \newpage
-
-
 
 ## References
