@@ -257,6 +257,8 @@ print(map / map_se + plot_layout(guides = "collect"))
 
 dev.off()
 
+map_save <- map / map_abund + plot_layout(guides = "collect")
+saveRDS(map_save,paste0("Figures/saved_map_",firstYear,".rds"))
 
 pdf(paste0("Figures/Figure_4both.pdf"),
     height = 10,
@@ -455,7 +457,8 @@ print(map / map_se + plot_layout(guides = "collect"))
 
 dev.off()
 
-
+map_save <- map / map_abund + plot_layout(guides = "collect")
+saveRDS(map_save,paste0("Figures/saved_map_",firstYear,".rds"))
 pdf(paste0("Figures/Figure_4both_1985.pdf"),
     height = 10,
     width = 7)
@@ -509,15 +512,23 @@ Ahabs <- summ %>%
   mutate(across(2:7,~exp(.x)),
          firstyear = firstYear,
          parameter = "Rho_alpha")
-
+CH <- summ %>% 
+  filter(variable == "CH") %>% 
+  mutate(firstyear = firstYear)
+TT <- summ %>% 
+  filter(variable %in% c("T","T_no_habitat")) %>% 
+  mutate(firstyear = firstYear)
 hypers_out <- bind_rows(hypers_out,Bhabs)
 hypers_out <- bind_rows(hypers_out,Ahabs)
+hypers_out <- bind_rows(hypers_out,CH)
+hypers_out <- bind_rows(hypers_out,TT)
 
 }
 
+saveRDS(hypers_out,"saved_hyperparameters.rds")
+saveRDS(route_params_out,"saved_route_parameters.rds")
 
-beta_plot <- ggplot(data = betahabs)+
-  geom_errorbar(aes())
+
 
 
   
