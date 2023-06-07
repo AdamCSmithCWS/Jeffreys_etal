@@ -1,0 +1,377 @@
+---
+title: "Supplemental_analyses"
+format: pdf
+editor: visual
+execute: 
+  echo: false
+  include: false
+  warning: false
+  error: false
+  output: asis 
+---
+
+```{r setup}
+
+library(bbsBayes2)
+library(tidyverse)
+library(sf)
+library(cmdstanr)
+library(patchwork)
+
+output_dir <- "output"
+species <- "Rufous Hummingbird" 
+
+
+species_f <- gsub(gsub(species,pattern = " ",replacement = "_",fixed = T),pattern = "'",replacement = "",fixed = T)
+
+spp1 <- "habitat"
+
+spp <- paste0("_",spp1,"_")
+
+exp_t <- function(x){
+  y <- (exp(x)-1)*100
+}
+
+```
+
+Model structure
+
+The model is a relatively simple, hierarchical log-link negative binomial regression, like other models commonly applied to the BBS (Sauer and Link 2011, Smith et al. 2014), except applied at the route-level instead of pooling routes into geographic strata (e.g., Betts et al. 2022). In this model, each route has a separate slope and intercept and there are no annual intercepts to model annual or non-linear temporal patterns in population change. Therefore, the interpretation of "trend" in these models is limited to a log-linear slope parameter.
+
+$$
+C_{r,j,t}=Negative\ Binomial\left(\lambda_{r,j,t},\phi\right)
+$$
+
+$$
+log\left(\lambda_{r,j,t}\right)=\alpha_r+\beta_r\ast\left(t-t_m\right)+ηΙj,t+ωj
+$$ We modeled the observed counts ($C_{r,j,t}$) of Rufous Hummingbirds on route-r, in year-t, by observer-j as as realizations of a negative binomial distribution, with mean $\lambda_{r,j,t}$ and inverse dispersion parameter $\phi$. The log of the mean ($\lambda_{r,j,t}$) of the negative binomial distribution was modeled as an additive combination of route-level intercepts ($\alpha_r$), observer-effects ($\omega_j$), and a first-year observer-effect ($\eta I[j,t]$), and route-level slope parameters ($\beta_r$) for the continuous effect of year ($t$) centered on the mid-year of the time-series ($t_m$).
+
+We estimated the the first-year observer-effect $\eta$, as an independent parameter with weakly informative prior (below). All other parameters were estimated as hierarchical-effects, sharing information among routes or among observers.
+
+We estimated the route-level intercepts and slopes as an additive combination of a mean species-level intercept or slope ($\alpha^\prime$ or $\beta^\prime$), a varying intercept or slope that was a function of the mean habitat suitability on the route ($\alpha_r^{\prime\prime}$) or rate of change in habitat suitability on the slope ($\beta_r^{\prime\prime}$), and spatially varying effects for the remaining variation in relative abundance ($\alpha_r^{\prime\prime\prime}$) and slope ($\beta_r^{\prime\prime\prime}$) that were not explained by habitat.
+
+$$
+ \alpha_r=\ \ \alpha^\prime+\alpha_r^{\prime\prime}+\alpha_r^{\prime\prime\prime}
+$$
+
+We estimated the effect of mean habitat suitability on the route-level intercept as a simple product of a route-specific coefficient ($\rho_{\alpha{_r}}$) and the average of the annual habitat suitabilities in a buffer surrounding each route-path ($\alpha_r^{\prime\prime}=\rho_{\alpha{_r}}*\mu_{habitat suitability_{r}}$). We estimated the effect of the rate of change in habitat suitability over time on the route-level slope as a product of a route-specific coefficient ($\rho_{\beta{_r}}$) and an estimate of the average rate of change in habitat suitability on each route ($\delta_{habitat suitability_{r}}$), calculated using a simple linear regression through the annual estimates of habitat suitability in a buffer surrounding each route-path ($\beta_r^{\prime\prime}=\rho_{\beta{_r}}*\delta_{habitat suitability}$). The habitat suitability predictors were standardized (both centered and scaled) to improve convergence. The route-specific coefficients for the effects of habitat suitablility on the intercept and slope were allowed to vary among routes, but were centered on a hyperparameter mean effects across routes $\rho_{\alpha{_r}} \sim Normal\left(P_{\alpha},\sigma_{\rho_{\alpha}}\right)$ and $\rho_{\beta{_r}} \sim Normal\left(P_{\beta},\sigma_{\rho_{\beta}}\right)$. As such, the hyperparameters for the effect of mean habitat suitability on the intercept ($P_{\alpha}$) and the effect of change in habitat suitablility on slope ($P_{\beta}$), represent a clear species-level estimate of the overall effects of habitat on abundance and trend, after adjusting for the species mean abundance and trend, as well as the residual spatially dependent variation in abundance and trend.
+
+We estimated the spatially varying component of the intercepts and slopes using an intrinsic iCAR structure, where the parameter for route-r is drawn from a normal distribution, centered on the mean of that parameter's values in all neighbouring routes, with an estimated standard deviation that is proportional to the inverse of the number of neighbours for that route (Morris et al. 2019). Specifically, the component of the intercept that represents the residual spatially dependent relative abundance ($\alpha_r^{\prime\prime\prime}$) was drawn from a normal distribution centered on the mean of the intercepts for all neighbouring routes.
+
+$$
+\alpha_r^{\prime\prime\prime} \sim Normal\left(\frac{\sum_{n{\in N}_r}\alpha_n^{\prime\prime\prime}}{N_r},\frac{\sigma_{\alpha^{\prime\prime\prime}}}{N_r}\right)
+$$
+
+The spatially varying component of the slope ($\beta_r$) were estimated similarly as random route-level terms from a normal distribution centered on the mean of the slopes for all neighbouring routes using the same iCAR structure. $$
+\beta_r^{\prime\prime\prime}\sim Normal\left(\frac{\sum_{n{\in N}_r}\beta_n^{\prime\prime\prime}}{N_r},\frac{\sigma_{\beta^{\prime\prime\prime}}}{N_r}\right)
+$$
+
+## Spatial components
+
+In other work, we have fit models with two different approaches to modeling the spatially explicit relationships among routes: a Gaussian process (GP) model that uses a matrix of Euclidian distances separating the start-locations of each BBS route, treating distance between routes as a continuous measure; and 2) an intrinsic Conditional Autoregressive (iCAR) structure that uses a sparse matrix of adjacencies between pairs of routes based on a tessellation of the intervening space, treating spatial relationships as a series of discrete neighbours. Because the observations from a given BBS route are collected along a transect that is approximately 40km in length, it is not obvious which treatment of the spatial relationships better reflects reality. Spatial models are well developed for data collected at points and for data collected within discrete areas (), but the BBS transects are neither points nor areas. Our prior work has shown that for route-level models of BBS data, the GP and iCAR approaches result in almost identical predictions, but the iCAR approach is much less computationally demanding (models fit in minutes rather than hours or days).
+
+Both of these approaches are simplifications of the true spatial relationships among the BBS routes. The GP approach simplifies the spatial relationships by assuming each route represents a point in space and ensures that the covariance between pairs of routes declines with distance, but that measure of intervening distance only applies to the distances between the start points of the routes, not to the full transect. The iCAR approach simplifies the spatial structure by assuming each route represents a discrete area of space (a polygon surrounding the route), but the neighbouring routes may be separated by a wide range of distances depending on the spatial distribution and spatial density of those routes. For example, the GP could consider two distant routes as effectively independent, irresepective of how many routes were located in the intervening space. By contrast, the iCAR structure could consider these same two routes as having a very close connection if there were no intervening routes. In some cases, treating two relatively distant routes as close neighbours may be useful if their relative proximity provides useful information to inform the parameter estimates but may also introduce error into the estimate of spatial variance by considering the relatively distant neighbours as similar to relatively close neighbours.
+
+The iCAR spatial structures require a discrete representation of spatial neighbourhood relationships (Ver Hoef et al. 2018), we used a Voronoi tessellation to generate these discrete neighbourhood relationships (Pebesma and Bivand, 2023). iCAR models are often applied to contiguous areal stratifications, such as regular grids, census regions, or political jurisdictions, which have natural neighbourhood relationships defined by their adjacencies (Ver Hoef et al. 2018, Meehan et al. 2019). To generate contiguous discrete spatial units without imposing a regular grid structure, we created a Voronoi tessellation centered on the start points of each BBS route (Pebesma 2018). We further limited the adjaceny matrix to the approximate boundaries of the species' range, by clipping the tessellated surface using the standard BBS analytical strata where the species occurs (province/states intersected with the Bird Conservation Regions; Link and Sauer 2002) and a concave polygon surrounding the route start locations (concaveman package). This clipping ensured that adjacency relationships did not extend beyond the borders of the species' range, and allowed the adjacency matrix to respect large-scale complex range boundaries. Within the species' range boundaries, routes were considered neighbours if their Voronoi polygon shared a linear segment along a separating boundary (Figure 1). Our approach to generating these adjacency relationships may introduce variance, because some neighbouring routes may be much further apart than others. However, it is sufficiently flexible to ensure a comprehensive and contiguous network of among-route links, and accurately represents the relative spatial adjacencies (each route is considered adjacent to its nearest neighbours) if not always the true Euclidean space.
+
+## Fitting the model
+
+The model assumes that population trends at a given route can be reasonably described using a continuous log-linear slope parameter. This assumption of *trend* as an average rate of change across the entire time-series is probably most reasonable for relatively short periods of time (e.g., 10-20 years). For longer periods of time it is likely that natural populations will follow some more complex, non-linear path and therefore that the assumption of a continuous rate of change in the population over the full time-series is less likely (Smith and Edwards 2020). Indeed, for Rufous Hummingbird populations in North America appear to show a break point in the population trend in approximately 2005. Between 1985 and 2005, the continental population was relatively stable, and after 2005 it declined steeply (). To account for this nonlinearity in the population trajectory, we fit the model separately for the 20-year period from 1985-2005 and for the 15-year period from 2006-2021.
+
+Before fitting the model, we prepared the BBS counts, the neighbourhood structures necessary to estimate the iCAR residual spatial component, and joined them to the habitat suitablity predictors. The full code and data necessary to replicate the data-preparation is available in the online supplement (). In brief, we selected all routes on which the species had been observed during the time-period (1985-2005 or 2006-2021), and for which we had GIS route-path information that would allow us to estimate the route-specific annual habitat suitability values.
+
+We fit the model using the probablistic programming language Stan (), accessed through the R-package `cmdstanr` (). We used a warm-up of 2000 iterations, and `cmdstanr` default settings for other arguments, followed by a draw of 2000 samples from which we estimated the posterior distributions. All parameters in all models converged based on Rhat \< 1.01 and bulk effective sample sizes \> 1000.
+
+## Results
+
+### 1985-2005
+
+```{r}
+firstYear <- 1985
+  lastYear <- ifelse(firstYear == 1985,2005,2021)
+out_base <- paste0(species_f,spp,firstYear,"_",lastYear)
+sp_data_file <- paste0("Data/",species_f,"_",firstYear,"_",lastYear,"_stan_data.RData")
+load(sp_data_file)
+
+
+summ <- readRDS(paste0(output_dir,"/",out_base,"_summ_fit.rds"))
+BETA_summ <- summ %>% filter(variable %in% c("BETA","BETA_hab"))
+ALPHA_summ <- summ %>% filter(variable %in% c("ALPHA","ALPHA_hab"))
+T_summ <- summ %>% filter(grepl("T",variable))
+CH_summ <- summ %>% filter(grepl("CH",variable))
+
+mn0 <- new_data %>% 
+  group_by(routeF) %>% 
+  summarise(mn = mean(count),
+            mx = max(count),
+            ny = n(),
+            fy = min(year),
+            ly = max(year),
+            sp = max(year)-min(year))
+
+route_map_2006 <- route_map 
+
+
+base_strata_map <- bbsBayes2::load_map("bbs_usgs")
+
+
+strata_bounds <- st_union(route_map) #union to provide a simple border of the realised strata
+bb = st_bbox(strata_bounds)
+xlms = as.numeric(c(bb$xmin,bb$xmax))
+ylms = as.numeric(c(bb$ymin,bb$ymax))
+
+betas1 <- summ %>% 
+  filter(grepl("beta[",variable,fixed = TRUE)) %>% 
+  mutate(across(2:7,~exp_t(.x)),
+         routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}")),
+         parameter = "full") %>% 
+  select(routeF,mean,sd,parameter) %>% 
+  rename(trend = mean,
+         trend_se = sd)
+
+alpha1 <- summ %>% 
+  filter(grepl("alpha[",variable,fixed = TRUE)) %>% 
+  mutate(across(2:7,~exp(.x)),
+         routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}"))) %>% 
+  select(routeF,median,sd) %>% 
+  rename(abundance = median,
+         abundance_se = sd)
+betas1 <- betas1 %>% 
+  inner_join(.,alpha1)
+
+betas2 <- summ %>% 
+  filter(grepl("beta_trend[",variable,fixed = TRUE)) %>% 
+  mutate(across(2:7,~exp_t(.x)),
+         routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}")),
+         parameter = "no habitat") %>% 
+  select(routeF,mean,sd,parameter) %>% 
+  rename(trend = mean,
+         trend_se = sd)
+betas2 <- betas2 %>% 
+  inner_join(.,alpha1,by = "routeF") %>% 
+  inner_join(.,mn0,by = "routeF")
+
+
+betas <- bind_rows(betas1,betas2)
+
+plot_map <- route_map_2006 %>% 
+  left_join(.,betas,
+            by = "routeF",
+            multiple = "all") 
+
+breaks <- c(-7, -4, -2, -1, -0.5, 0.5, 1, 2, 4, 7)
+lgnd_head <- "Mean Trend\n"
+trend_title <- "Mean Trend"
+labls = c(paste0("< ",breaks[1]),paste0(breaks[-c(length(breaks))],":", breaks[-c(1)]),paste0("> ",breaks[length(breaks)]))
+labls = paste0(labls, " %/year")
+plot_map$Tplot <- cut(plot_map$trend,breaks = c(-Inf, breaks, Inf),labels = labls)
+
+
+map_palette <- c("#a50026", "#d73027", "#f46d43", "#fdae61", "#fee090", "#ffffbf",
+                 "#e0f3f8", "#abd9e9", "#74add1", "#4575b4", "#313695")
+names(map_palette) <- labls
+
+
+
+map <- ggplot()+
+  geom_sf(data = base_strata_map,
+          fill = NA,
+          colour = grey(0.75))+
+  geom_sf(data = plot_map,
+          aes(colour = Tplot,
+              size = abundance))+
+  scale_size_continuous(range = c(0.05,2),
+                        name = "Mean Count")+
+  scale_colour_manual(values = map_palette, aesthetics = c("colour"),
+                      guide = guide_legend(reverse=TRUE),
+                      name = paste0(lgnd_head))+
+  coord_sf(xlim = xlms,ylim = ylms)+
+  theme_bw()+
+  labs(title = paste(firstYear,"-",lastYear))+
+  facet_wrap(vars(parameter))
+
+
+hab_eff <- ALPHA_summ %>% 
+  filter(variable == "ALPHA_hab") %>% 
+  select(mean,q5,q95) %>% 
+  unlist() %>% 
+  signif(.,2)
+hab_eff <- paste0(hab_eff["mean"]," ","[",hab_eff["q5"],
+                 "-",hab_eff["q95"],"]")
+
+hab_slope <- BETA_summ %>% 
+  filter(variable == "BETA_hab") %>% 
+  select(mean,q5,q95) %>% 
+  unlist() %>% 
+  signif(.,2)
+hab_slope <- paste0(hab_slope["mean"]," ","[",hab_slope["q5"],
+                 "-",hab_slope["q95"],"]")
+
+
+chtotal <- CH_summ %>% 
+  filter(variable == "CH") %>% 
+  select(mean,q5,q95) %>% 
+  unlist() %>% 
+  signif(.,2)
+chtotal <- paste0(chtotal["mean"],"% ","[",chtotal["q5"],
+                 "-",chtotal["q95"],"]")
+
+```
+
+During the first 20 years from 1985-2005, the species overall population was generally stable. The model estimated an overall change in the population of approximately `chtotal`. Trends varied among routes and regions (Figure 1). The effect of habitat on mean relative abundance was strong and positive (`hab_eff`), if the residual trend was modeled without the spatial-dependency. However, when the spatial dependency was included, most of the variation in the relative abundance was allocated to the spatial component. There was a positive effect of change in the habitat suitability on trends, such that routes with habitat-loss had more negative population trends. However, this effect was somewhat uncertain $P_{r_{\beta}}$ = `hab_slope`, and 0 was included within the 95% posterior credible interval.  
+
+```{r}
+#/ include: true
+#| label: fig-figure-1
+#| fig-cap: "Map of the trends for Rufous Hummingbird from 1985-2005. The colours represent the trend and the size of the points represent the mean relative abundance (estimated mean counts)"
+print(map)
+
+```
+
+
+
+
+### 2006-2021
+
+```{r}
+firstYear <- 2006
+  lastYear <- ifelse(firstYear == 1985,2005,2021)
+out_base <- paste0(species_f,spp,firstYear,"_",lastYear)
+sp_data_file <- paste0("Data/",species_f,"_",firstYear,"_",lastYear,"_stan_data.RData")
+load(sp_data_file)
+
+
+summ <- readRDS(paste0(output_dir,"/",out_base,"_summ_fit.rds"))
+BETA_summ <- summ %>% filter(variable %in% c("BETA","BETA_hab"))
+ALPHA_summ <- summ %>% filter(variable %in% c("ALPHA","ALPHA_hab"))
+T_summ <- summ %>% filter(grepl("T",variable))
+CH_summ <- summ %>% filter(grepl("CH",variable))
+
+mn0 <- new_data %>% 
+  group_by(routeF) %>% 
+  summarise(mn = mean(count),
+            mx = max(count),
+            ny = n(),
+            fy = min(year),
+            ly = max(year),
+            sp = max(year)-min(year))
+
+route_map_2006 <- route_map 
+
+
+base_strata_map <- bbsBayes2::load_map("bbs_usgs")
+
+
+strata_bounds <- st_union(route_map) #union to provide a simple border of the realised strata
+bb = st_bbox(strata_bounds)
+xlms = as.numeric(c(bb$xmin,bb$xmax))
+ylms = as.numeric(c(bb$ymin,bb$ymax))
+
+betas1 <- summ %>% 
+  filter(grepl("beta[",variable,fixed = TRUE)) %>% 
+  mutate(across(2:7,~exp_t(.x)),
+         routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}")),
+         parameter = "full") %>% 
+  select(routeF,mean,sd,parameter) %>% 
+  rename(trend = mean,
+         trend_se = sd)
+
+alpha1 <- summ %>% 
+  filter(grepl("alpha[",variable,fixed = TRUE)) %>% 
+  mutate(across(2:7,~exp(.x)),
+         routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}"))) %>% 
+  select(routeF,median,sd) %>% 
+  rename(abundance = median,
+         abundance_se = sd)
+betas1 <- betas1 %>% 
+  inner_join(.,alpha1)
+
+betas2 <- summ %>% 
+  filter(grepl("beta_trend[",variable,fixed = TRUE)) %>% 
+  mutate(across(2:7,~exp_t(.x)),
+         routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}")),
+         parameter = "no habitat") %>% 
+  select(routeF,mean,sd,parameter) %>% 
+  rename(trend = mean,
+         trend_se = sd)
+betas2 <- betas2 %>% 
+  inner_join(.,alpha1,by = "routeF") %>% 
+  inner_join(.,mn0,by = "routeF")
+
+
+betas <- bind_rows(betas1,betas2)
+
+plot_map <- route_map_2006 %>% 
+  left_join(.,betas,
+            by = "routeF",
+            multiple = "all") 
+
+breaks <- c(-7, -4, -2, -1, -0.5, 0.5, 1, 2, 4, 7)
+lgnd_head <- "Mean Trend\n"
+trend_title <- "Mean Trend"
+labls = c(paste0("< ",breaks[1]),paste0(breaks[-c(length(breaks))],":", breaks[-c(1)]),paste0("> ",breaks[length(breaks)]))
+labls = paste0(labls, " %/year")
+plot_map$Tplot <- cut(plot_map$trend,breaks = c(-Inf, breaks, Inf),labels = labls)
+
+
+map_palette <- c("#a50026", "#d73027", "#f46d43", "#fdae61", "#fee090", "#ffffbf",
+                 "#e0f3f8", "#abd9e9", "#74add1", "#4575b4", "#313695")
+names(map_palette) <- labls
+
+
+
+map <- ggplot()+
+  geom_sf(data = base_strata_map,
+          fill = NA,
+          colour = grey(0.75))+
+  geom_sf(data = plot_map,
+          aes(colour = Tplot,
+              size = abundance))+
+  scale_size_continuous(range = c(0.05,2),
+                        name = "Mean Count")+
+  scale_colour_manual(values = map_palette, aesthetics = c("colour"),
+                      guide = guide_legend(reverse=TRUE),
+                      name = paste0(lgnd_head))+
+  coord_sf(xlim = xlms,ylim = ylms)+
+  theme_bw()+
+  labs(title = paste(firstYear,"-",lastYear))+
+  facet_wrap(vars(parameter))
+
+
+hab_eff <- ALPHA_summ %>% 
+  filter(variable == "ALPHA_hab") %>% 
+  select(mean,q5,q95) %>% 
+  unlist() %>% 
+  signif(.,2)
+hab_eff <- paste0(hab_eff["mean"]," ","[",hab_eff["q5"],
+                 "-",hab_eff["q95"],"]")
+
+hab_slope <- BETA_summ %>% 
+  filter(variable == "BETA_hab") %>% 
+  select(mean,q5,q95) %>% 
+  unlist() %>% 
+  signif(.,2)
+hab_slope <- paste0(hab_slope["mean"]," ","[",hab_slope["q5"],
+                 "-",hab_slope["q95"],"]")
+
+
+chtotal <- CH_summ %>% 
+  filter(variable == "CH") %>% 
+  select(mean,q5,q95) %>% 
+  unlist() %>% 
+  signif(.,2)
+chtotal <- paste0(chtotal["mean"],"% ","[",chtotal["q5"],
+                 "-",chtotal["q95"],"]")
+
+```
+
+During the l ater 15 years from 2006-2021, the species overall population declined steeply. The model estimated an overall change in the population of approximately `chtotal`. Trends were negative across the species' range, but most negative in the coastal regions where the species is also most abundant (Figure 2). The effect of habitat suitability on mean relative abundance was strong and positive (`hab_eff`), and this effect was robust, whether the residual abundance component was spatially autocorrellated or random. There was a clear positive effect of change in the habitat suitability on trends, such that routes with habitat-loss had more negative population trends $P_{r_{\beta}}$ = `hab_slope`. The greater loss of habitat in the coastal region accounts for most of the increased rates of decline in that region (Figure 2), the residual trend component alone (Figure 2, right panel) does not show the geographic pattern.  
+
+```{r}
+#/ include: true
+#| label: fig-figure-2
+#| fig-cap: "Map of the trends for Rufous Hummingbird from 2006-2021 The colours represent the trend and the size of the points represent the mean relative abundance (estimated mean counts). The left panel represents the full estimated trend on each route, including both the effect of change in habitat-suitability and the residual spatial component. In the left panel, the greater declines in coastal regions are evident from the darker red points. The right panel represents the trends after removing the effect of change in habitat-suitability, and in this case the darker red points in coastal regions are not evident."
+print(map)
+
+```
+

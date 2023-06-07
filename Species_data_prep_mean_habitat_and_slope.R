@@ -1,4 +1,6 @@
 ## Prepare data for modeling
+
+# This script 
 setwd("C:/Users/SmithAC/Documents/GitHub/Jefferys_etal")
 library(bbsBayes)
 library(tidyverse)
@@ -137,10 +139,6 @@ hsi <- read.csv("data/MeanHSI_BBSRoute_yearly.csv")
 
 
 # clean route names to separate names and numbers in canadian routes
-
-
-
-
 hsi <- hsi %>% 
   mutate(RTENO_2 = ifelse(str_detect(RTENAME,"[[:digit:]]"),
                           str_extract_all(RTENAME,"[[:digit:]]{2}-[[:digit:]]{3}"),
@@ -163,13 +161,17 @@ hsi <- hsi %>%
 # 
 # hab_vis
 
+#
 
+### joint the list of routes with BBS survey data and the habitat info
 join_test1 <- rt_names_counts %>% 
   filter(statenum != 3) %>% 
   left_join(.,hsi,
             by = c("rt.uni","RouteName"),
             multiple = "all")
 
+### Alaska route numbers are not in the file, so need to join
+### separately.
 AK <- rt_names_counts %>% 
   filter(statenum == 3) %>% 
   left_join(.,hsi,
@@ -177,20 +179,24 @@ AK <- rt_names_counts %>%
             multiple = "all") %>% 
   select(-rt.uni.y) %>% 
   rename(rt.uni = rt.uni.x) 
-
+### combine AK and rest of route names and numbers
 join_test <- bind_rows(AK,join_test1)
 
 
+# there are some routes for which route-GIS data were not available
 missing_habitat <- join_test %>% 
   filter(is.na(meanHSI))
 
 write.csv(missing_habitat,
           paste0("routes_with_RUHU_data_missing_habitat",firstYear,".csv"))
 
+
+### drop the routes with no HSI information
 join_table <- join_test %>% 
   filter(!is.na(meanHSI))
 
 hab_full <- join_table
+### hab_full is a full list of annual hsi measures
 
 # hab_vis <- ggplot(data = hab_full,
 #                   aes(x = year,y = meanHSI,
@@ -233,10 +239,11 @@ new_data <- new_data %>%
 #   facet_wrap(vars(strat_name))
 # 
 # hab_vis
+
+
+
+
 # Spatial neighbours set up --------------------
-
-
-
 strata_list <- data.frame(ST_12 = unique(new_data$strat_name),
                           strat = unique(new_data$strat))
 
@@ -261,7 +268,7 @@ route_map = unique(data.frame(route = new_data$route,
 # their original location and retain reasonable neighbourhood relationships
 # these duplicates happen when a "new" route is established (i.e., a route is re-named) 
 # because some large proportion
-# of the end of a route is changed, but the start-point remains the same
+# of the route is changed, but the start-point remains the same
 dups = which(duplicated(route_map[,c("Latitude","Longitude")]))
 while(length(dups) > 0){
   route_map[dups,"Latitude"] <- route_map[dups,"Latitude"]+0.01 #=0.01 decimal degrees ~ 1km
@@ -302,9 +309,10 @@ car_stan_dat <- neighbours_define_voronoi(real_point_map = route_map,
                                   strat_indicator = "routeF",
                                   strata_map = realized_strata_map,
                                   concavity = 1)#concavity argument from concaveman()
-	
-print(car_stan_dat$map)
 ## a relative measure of concavity. 1 results in a relatively detailed shape, Infinity results in a convex hull.
+
+## see the map of connections
+print(car_stan_dat$map)
 
 
 pdf(paste0("data/maps/route_map_",firstYear,"-",lastYear,"_",species_f,".pdf"))
@@ -350,6 +358,7 @@ slope_full <- slope_full %>%
   arrange(routeF)
   
 
+### Build the data list required for Stan
 
 
 stan_data <- list()
@@ -359,7 +368,7 @@ stan_data[["strat"]] <- new_data$strat
 stan_data[["route"]] <- new_data$routeF
 stan_data[["year"]] <- new_data$year
 stan_data[["firstyr"]] <- new_data$firstyr
-stan_data[["fixedyear"]] <- jags_data$fixedyear
+stan_data[["fixedyear"]] <- jags_data$fixedyear # mis-year of time series
 
 
 stan_data[["nyears"]] <- max(new_data$year)

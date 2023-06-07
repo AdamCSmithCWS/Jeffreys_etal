@@ -22,7 +22,7 @@ species <- "Rufous Hummingbird"
   
 species_f <- gsub(gsub(species,pattern = " ",replacement = "_",fixed = T),pattern = "'",replacement = "",fixed = T)
 
-for(spp1 in c("nonspatial","habitat_predict_slope_spatial")){#},"iCAR")){
+for(spp1 in c("habitat_predict_slope_spatial_resid","habitat_predict_slope_spatial")){#},"iCAR")){
 
 
   spp <- paste0("_",spp1,"_")
@@ -84,6 +84,11 @@ saveRDS(stanfit,
 
 saveRDS(summ,
         paste0(output_dir,"/",out_base,"_summ_fit.rds"))
+
+summ %>% arrange(-rhat)
+summ %>% filter(variable %in% c("BETA","BETA_hab"))
+summ %>% filter(grepl("T",variable))
+summ %>% filter(grepl("CH",variable))
 
 
 } #end models loop
