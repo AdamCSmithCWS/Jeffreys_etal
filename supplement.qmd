@@ -218,7 +218,7 @@ chtotal <- paste0(chtotal["mean"],"% ","[",chtotal["q5"],
 
 ```
 
-During the first 20 years from 1985-2005, the species overall population was generally stable. The model estimated an overall change in the population of approximately `chtotal`. Trends varied among routes and regions (Figure 1). The effect of habitat on mean relative abundance was strong and positive (`hab_eff`), if the residual trend was modeled without the spatial-dependency. However, when the spatial dependency was included, most of the variation in the relative abundance was allocated to the spatial component. There was a positive effect of change in the habitat suitability on trends, such that routes with habitat-loss had more negative population trends. However, this effect was somewhat uncertain $P_{r_{\beta}}$ = `hab_slope`, and 0 was included within the 95% posterior credible interval.  
+During the first 20 years from 1985-2005, the species overall population was generally stable. The model estimated an overall change in the population of approximately `chtotal`. Trends varied among routes and regions (Figure 1). The effect of habitat on mean relative abundance was strong and positive (`hab_eff`), if the residual trend was modeled without the spatial-dependency. However, when the spatial dependency was included, most of the variation in the relative abundance was allocated to the spatial component. There was a positive effect of change in the habitat suitability on trends, such that routes with habitat-loss had more negative population trends. However, this effect was somewhat uncertain $P_{r_{\beta}}$ = `hab_slope`, and 0 was included within the 95% posterior credible interval.
 
 ```{r}
 #/ include: true
@@ -227,9 +227,6 @@ During the first 20 years from 1985-2005, the species overall population was gen
 print(map)
 
 ```
-
-
-
 
 ### 2006-2021
 
@@ -365,7 +362,7 @@ chtotal <- paste0(chtotal["mean"],"% ","[",chtotal["q5"],
 
 ```
 
-During the l ater 15 years from 2006-2021, the species overall population declined steeply. The model estimated an overall change in the population of approximately `chtotal`. Trends were negative across the species' range, but most negative in the coastal regions where the species is also most abundant (Figure 2). The effect of habitat suitability on mean relative abundance was strong and positive (`hab_eff`), and this effect was robust, whether the residual abundance component was spatially autocorrellated or random. There was a clear positive effect of change in the habitat suitability on trends, such that routes with habitat-loss had more negative population trends $P_{r_{\beta}}$ = `hab_slope`. The greater loss of habitat in the coastal region accounts for most of the increased rates of decline in that region (Figure 2), the residual trend component alone (Figure 2, right panel) does not show the geographic pattern.  
+During the l ater 15 years from 2006-2021, the species overall population declined steeply. The model estimated an overall change in the population of approximately `chtotal`. Trends were negative across the species' range, but most negative in the coastal regions where the species is also most abundant (Figure 2). The effect of habitat suitability on mean relative abundance was strong and positive (`hab_eff`), and this effect was robust, whether the residual abundance component was spatially autocorrellated or random. There was a clear positive effect of change in the habitat suitability on trends, such that routes with habitat-loss had more negative population trends $P_{r_{\beta}}$ = `hab_slope`. The greater loss of habitat in the coastal region accounts for most of the increased rates of decline in that region (Figure 2), the residual trend component alone (Figure 2, right panel) does not show the geographic pattern.
 
 ```{r}
 #/ include: true
@@ -374,4 +371,3 @@ During the l ater 15 years from 2006-2021, the species overall population declin
 print(map)
 
 ```
-

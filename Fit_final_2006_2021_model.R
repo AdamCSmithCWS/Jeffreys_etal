@@ -1,5 +1,7 @@
 ## Fitting the habitat-change model with iCAR trend component to 2006 - 2021 BBS data
 setwd("C:/GitHub/Jeffreys_etal") #useful if running in standaolone R session (avoids Rstudio fails)
+setwd("C:/Users/SmithAC/Documents/GitHub/Jefferys_etal")
+
 library(tidyverse)
 library(cmdstanr)
 library(patchwork)
