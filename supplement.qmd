@@ -86,7 +86,7 @@ The model assumes that population trends at a given route can be reasonably desc
 
 Before fitting the model, we prepared the BBS counts, the neighbourhood structures necessary to estimate the iCAR residual spatial component, and joined them to the habitat suitablity predictors. The full code and data necessary to replicate the data-preparation is available in the online supplement. In brief, we selected all routes on which the species had been observed during the time-period (1985-2005 or 2006-2021), and for which we had GIS route-path information that would allow us to estimate the route-specific annual habitat suitability values.
 
-We fit the model using the probablistic programming language Stan [@standevelopmentteam2022], accessed through the R-package `cmdstanr` [@gabry2022]. We used a warm-up of 2000 iterations, and `cmdstanr` default settings for other arguments, followed by a draw of 2000 samples from which we estimated the posterior distributions. All parameters in all models converged based on Rhat \< 1.01 and bulk effective sample sizes \> 500.
+We fit the model using the probablistic programming language Stan [@standevelopmentteam2022], accessed through the R-package `cmdstanr` [@gabry2022]. We used a warm-up of 2000 iterations, and `cmdstanr` default settings for other arguments, followed by a draw of 2000 samples from which we estimated the posterior distributions. All parameters in all models converged based on Rhat \< 1.02 and bulk effective sample sizes \> 500.
 
 \newpage
 
@@ -101,22 +101,22 @@ lastYear <- ifelse(firstYear == 1985,2005,2021)
 hypers_out <- readRDS("saved_hyperparameters.rds")
 
 hab_eff <- hypers_out %>% 
-  filter(variable == "ALPHA_hab",
+  filter(variable == "rho_ALPHA_hab",
          firstyear == firstYear) %>% 
   select(mean,q5,q95) %>% 
   unlist() %>% 
   signif(.,2)
 hab_eff <- paste0(hab_eff["mean"]," ","[",hab_eff["q5"],
-                 "-",hab_eff["q95"],"]")
+                 ":",hab_eff["q95"],"]")
 
 hab_slope <- hypers_out %>% 
-  filter(variable == "BETA_hab",
+  filter(variable == "rho_BETA_hab",
          firstyear == firstYear) %>% 
   select(mean,q5,q95) %>% 
   unlist() %>% 
   signif(.,2)
 hab_slope <- paste0(hab_slope["mean"]," ","[",hab_slope["q5"],
-                 "-",hab_slope["q95"],"]")
+                 ":",hab_slope["q95"],"]")
 
 
 chtotal <- hypers_out %>% 
@@ -126,7 +126,7 @@ chtotal <- hypers_out %>%
   unlist() %>% 
   signif(.,2)
 chtotal <- paste0(chtotal["mean"],"% ","[",chtotal["q5"],
-                 "-",chtotal["q95"],"]")
+                 ":",chtotal["q95"],"]")
 
 ```
 
@@ -152,22 +152,22 @@ lastYear <- ifelse(firstYear == 1985,2005,2021)
 hypers_out <- readRDS("saved_hyperparameters.rds")
 
 hab_eff <- hypers_out %>% 
-  filter(variable == "ALPHA_hab",
+  filter(variable == "rho_ALPHA_hab",
          firstyear == firstYear) %>% 
   select(mean,q5,q95) %>% 
   unlist() %>% 
   signif(.,2)
 hab_eff <- paste0(hab_eff["mean"]," ","[",hab_eff["q5"],
-                 "-",hab_eff["q95"],"]")
+                 ":",hab_eff["q95"],"]")
 
 hab_slope <- hypers_out %>% 
-  filter(variable == "BETA_hab",
+  filter(variable == "rho_BETA_hab",
          firstyear == firstYear) %>% 
   select(mean,q5,q95) %>% 
   unlist() %>% 
   signif(.,2)
 hab_slope <- paste0(hab_slope["mean"]," ","[",hab_slope["q5"],
-                 "-",hab_slope["q95"],"]")
+                 ":",hab_slope["q95"],"]")
 
 
 chtotal <- hypers_out %>% 
@@ -177,7 +177,7 @@ chtotal <- hypers_out %>%
   unlist() %>% 
   signif(.,2)
 chtotal <- paste0(chtotal["mean"],"% ","[",chtotal["q5"],
-                 "-",chtotal["q95"],"]")
+                 ":",chtotal["q95"],"]")
 
 ```
 

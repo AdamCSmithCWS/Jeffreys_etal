@@ -17,13 +17,15 @@ data {
   int<lower=1> nyears;
   int<lower=1> nobservers;
  
-  array [ncounts] int<lower=0> count;              // count observations
+  array [ncounts] int<lower=0> count;   // count observations
   array [ncounts] int<lower=1> year; // year index
   array [ncounts] int<lower=1> route; // route index
-  array [ncounts] int<lower=0> firstyr; // first year index
-  array [ncounts] int<lower=1> observer;              // observer indicators
+  array [ncounts] int<lower=0> firstyr; // first year index =1 if observer's first year on route, 0 otherwise
+  array [ncounts] int<lower=1> observer;   // observer indicators
+  
+  // mean annual habitat suitability on route (centered and scaled)
   array [nroutes] real route_habitat;              
-
+  // mean rate of change in annual habitat suitability on route (centered)
   array [nroutes] real route_habitat_slope;              
 
   int<lower=1> fixedyear; // centering value for years
@@ -40,56 +42,57 @@ data {
 
 parameters {
 
-  vector[nroutes] beta_raw;
-  real BETA; 
-  vector[nroutes] beta_raw_hab;
-  real BETA_hab; 
+  vector[nroutes] beta_raw;// non-centered residual trend
+  real BETA; // hyperparameter mean residual trend
+  vector[nroutes] rho_beta_raw_hab;// non-centered habitat-based trend
+  real rho_BETA_hab; // hyperparameter mean habitat-based trend
 
-  vector[nroutes] alpha_raw;
-  vector[nroutes] alpha_raw_hab;
-  real ALPHA; 
-  real ALPHA_hab; 
+  vector[nroutes] alpha_raw;// non-centered residual intercept
+  real ALPHA; // hyperparameter mean residual intercept
+  vector[nroutes] rho_alpha_raw_hab;// non-centered habitat-based intercept
+  real rho_ALPHA_hab; // hyperparameter mean habitat-based intercept
 
   real eta; //first-year intercept
   
   vector[nobservers] obs_raw; //observer effects
 
   real<lower=0> sdnoise;    // inverse of sd of over-dispersion
- //real<lower=1> nu;  //optional heavy-tail df for t-distribution
   real<lower=0> sdobs;    // sd of observer effects
- real<lower=0> sdbeta;    // sd of slopes 
- real<lower=0> sdbeta_hab;    // sd of slopes 
-  real<lower=0> sdalpha;    // sd of intercepts
-  real<lower=0> sdalpha_hab;    // sd of intercepts
+  real<lower=0> sdbeta;    // sd of residual slopes 
+  real<lower=0> sdrho_beta_hab;    // sd of habitat-change effect on slopes 
+  real<lower=0> sdalpha;    // sd of residual intercepts
+  real<lower=0> sdrho_alpha_hab;    // sd of habitat effect on intercepts
 
   
 }
 
 transformed parameters{
   
-   vector[nroutes] beta;
-   vector[nroutes] beta_trend;
-   vector[nroutes] beta_hab;
+   vector[nroutes] beta; // full slope
+   vector[nroutes] beta_resid; //residual component of slope
+   vector[nroutes] beta_hab; //habitat component of slope
    
-  vector[nroutes] alpha;
-  vector[nroutes] alpha_hab;
-  vector[nroutes] alpha_resid;
-  vector[nobservers] obs;
-  real phi;
-  vector[ncounts] E;           // log_scale additive likelihood
+  vector[nroutes] alpha; // full intercept
+  vector[nroutes] alpha_hab; //habitat component intercepts
+  vector[nroutes] alpha_resid; // residual component intercepts
+  vector[nobservers] obs; // observer effects
+  real phi;//dipsersion of negative binomial
+  vector[ncounts] E;           // predicted log-scale counts (lambda)
 
 
 // covariate effect on intercepts and slopes
  
-   beta_trend = (sdbeta*beta_raw) + BETA;
-   beta_hab = (sdbeta_hab*beta_raw_hab) + BETA_hab;
-   
-   alpha_hab = (sdalpha_hab*alpha_raw_hab) + ALPHA_hab;
+   beta_resid = (sdbeta*beta_raw) + BETA;
    alpha_resid = (sdalpha*alpha_raw) + ALPHA;
+   
    for(s in 1:nroutes){
-     alpha[s] =  alpha_resid[s] + (alpha_hab[s]*route_habitat[s]);
-     beta[s] = beta_trend[s]  + (beta_hab[s]*route_habitat_slope[s]);
+   beta_hab[s] = ((sdrho_beta_hab*rho_beta_raw_hab[s]) + rho_BETA_hab) * (route_habitat_slope[s]);
+   alpha_hab[s] = ((sdrho_alpha_hab*rho_alpha_raw_hab[s]) + rho_ALPHA_hab) * (route_habitat[s]);
    }
+   
+   alpha =  alpha_resid + alpha_hab;
+   beta = beta_resid  + beta_hab;
+  
    
    obs = sdobs*obs_raw;
 
@@ -107,21 +110,22 @@ model {
 
 
 
-  // beta_raw ~ normal(0,1);
-  // sum(beta_raw) ~ normal(0,0.001*nroutes);
-  // spatially varying residual trend
-  beta_raw ~ icar_normal(nroutes, node1, node2); 
-  beta_raw_hab ~  normal(0,1); 
-  sum(beta_raw_hab) ~ normal(0,0.001*nroutes);
+  // habitat-change effects on slope
+  rho_beta_raw_hab ~  normal(0,1); 
+  sum(rho_beta_raw_hab) ~ normal(0,0.001*nroutes);//soft zero-sum constraint
+  // habitat-change effects on slope
+  rho_alpha_raw_hab ~ normal(0,1);
+  sum(rho_alpha_raw_hab) ~ normal(0,0.001*nroutes);//soft zero-sum constraint
+
   
+    // spatially varying residual trend and intercepts
+  beta_raw ~ icar_normal(nroutes, node1, node2); 
   if(fit_spatial){
    alpha_raw ~ icar_normal(nroutes, node1, node2);
   }else{
   alpha_raw ~ normal(0,1);
   sum(alpha_raw) ~ normal(0,0.001*nroutes);
   }
-  alpha_raw_hab ~ normal(0,1);
-  sum(alpha_raw_hab) ~ normal(0,0.001*nroutes);
 
   
   sdnoise ~ normal(0,0.5); //prior on scale of extra Poisson log-normal variance
@@ -129,24 +133,26 @@ model {
   sdobs ~ normal(0,0.3); //prior on sd of gam hyperparameters
  
   obs_raw ~ normal(0,1);//observer effects
-  sum(obs_raw) ~ normal(0,0.001*nobservers);
+  sum(obs_raw) ~ normal(0,0.001*nobservers); //soft-zero-sum constraint
 
-  count ~ neg_binomial_2_log(E,phi); //vectorized count likelihood with log-transformation
-  
   BETA ~ normal(0,0.1);// prior on fixed effect mean slope
-  BETA_hab ~ normal(0,0.1);// prior on fixed effect mean slope
+  rho_BETA_hab ~ normal(0,0.1);// prior on haibtat-change effect on slope
   ALPHA ~ normal(0,1);// prior on fixed effect mean intercept
-  ALPHA_hab ~ normal(0,1);// prior on fixed effect mean intercept
+  rho_ALPHA_hab ~ normal(0,1);// prior on habitat effect on intercept
   eta ~ normal(0,1);// prior on first-year observer effect
   
   
-  //spatial iCAR intercepts and slopes by strata
-  sdalpha ~ normal(0,2); //prior on sd of intercept variation
-  sdalpha_hab ~ normal(0,2); //prior on sd of intercept variation
 
-  sdbeta ~ normal(0,0.1);//~ normal(0,0.05); //boundary avoiding prior on sd of slope spatial variation w mean = 0.04 and 99% < 0.13
-  sdbeta_hab ~ normal(0,0.1);//~ normal(0,0.05); //boundary avoiding prior on sd of slope spatial variation w mean = 0.04 and 99% < 0.13
+  sdalpha ~ normal(0,2); //prior on sd of intercept 
+  sdrho_alpha_hab ~ normal(0,2); //prior on sd of habitat effect on intercept 
 
+  sdbeta ~ normal(0,0.1);// prior on sd of slope spatial variation w mean = 0.04 and 99% < 0.13
+  sdrho_beta_hab ~ normal(0,0.1);// prior on sd of habitat-change effect on slope 
+
+
+  // full count likelihood
+  count ~ neg_binomial_2_log(E,phi); //vectorized count likelihood with log-transformation
+ 
 
 
 }
@@ -164,7 +170,7 @@ model {
     real CH_no_habitat; //total change transformation of trend without habitat-component of slope
     real CH_dif; // difference between CH and CH_no_habitat
     real T_dif; // difference between T and T_no
-  real retrans_obs = 0;// 0.5*(sdobs^2);
+    real retrans_obs = 0;// 0.5*(sdobs^2);
 
 // intercepts and slopes
 
@@ -176,7 +182,7 @@ model {
 
 
       nsmooth[s,y] = exp(alpha[s] + beta[s] * (y-fixedyear)  + retrans_obs);//
-      nsmooth_no_habitat[s,y] = exp(alpha[s] + beta_trend[s] * (y-fixedyear)  + retrans_obs);//
+      nsmooth_no_habitat[s,y] = exp(alpha[s] + beta_resid[s] * (y-fixedyear)  + retrans_obs);//
         }
   NSmooth[y] = mean(nsmooth[,y]);
   NSmooth_no_habitat[y] = mean(nsmooth_no_habitat[,y]);

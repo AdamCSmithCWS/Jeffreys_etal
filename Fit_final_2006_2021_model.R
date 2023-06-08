@@ -72,7 +72,8 @@ saveRDS(summ,
         paste0(output_dir,"/",out_base,"_summ_fit.rds"))
 
 summ %>% arrange(-rhat)
-summ %>% filter(variable %in% c("BETA","BETA_hab"))
+summ %>% filter(variable %in% c("BETA","rho_BETA_hab"))
+summ %>% filter(variable %in% c("ALPHA","rho_ALPHA_hab"))
 summ %>% filter(grepl("T",variable))
 summ %>% filter(grepl("CH",variable))
 
@@ -155,7 +156,7 @@ betas1 <- betas1 %>%
   inner_join(.,alpha1)
 
 betas2 <- summ %>% 
-  filter(grepl("beta_trend[",variable,fixed = TRUE)) %>% 
+  filter(grepl("beta_resid[",variable,fixed = TRUE)) %>% 
   mutate(across(2:7,~exp_t(.x)),
          routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}")),
          parameter = "no habitat") %>% 
@@ -354,7 +355,7 @@ betas1 <- betas1 %>%
   inner_join(.,alpha1)
 
 betas2 <- summ %>% 
-  filter(grepl("beta_trend[",variable,fixed = TRUE)) %>% 
+  filter(grepl("beta_resid[",variable,fixed = TRUE)) %>% 
   mutate(across(2:7,~exp_t(.x)),
          routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}")),
          parameter = "no habitat") %>% 
@@ -510,11 +511,11 @@ route_params_out <- bind_rows(route_params_out,alphahabs)
 
 
 Bhabs <- summ %>% 
-  filter(grepl("BETA_hab",variable,fixed = TRUE)) %>% 
+  filter(grepl("rho_BETA_hab",variable,fixed = TRUE)) %>% 
   mutate(firstyear = firstYear,
          parameter = "Rho_beta")
 Ahabs <- summ %>% 
-  filter(grepl("ALPHA_hab",variable,fixed = TRUE)) %>% 
+  filter(grepl("rho_ALPHA_hab",variable,fixed = TRUE)) %>% 
   mutate(firstyear = firstYear,
          parameter = "Rho_alpha")
 CH <- summ %>% 
