@@ -6,6 +6,7 @@ library(tidyverse)
 library(cmdstanr)
 library(patchwork)
 library(sf)
+library(ggsn) #scale bars and north arrow
 
 
 
@@ -86,6 +87,7 @@ summ %>% filter(grepl("CH",variable))
 # graphing ----------------------------------------------------------------
 
 
+
 firstYear <- 2006
 lastYear <- ifelse(firstYear == 1985,2005,2021)
 
@@ -129,7 +131,7 @@ betas1 <- summ %>%
   filter(grepl("beta[",variable,fixed = TRUE)) %>% 
   mutate(across(2:7,~exp_t(.x)),
          routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}")),
-         parameter = "full") %>% 
+         parameter = "Full with Habitat-Change") %>% 
   select(routeF,mean,sd,parameter) %>% 
   rename(trend = mean,
          trend_se = sd)
@@ -138,7 +140,7 @@ alpha1 <- summ %>%
   filter(grepl("alpha[",variable,fixed = TRUE)) %>% 
   mutate(across(2:7,~exp(.x)),
          routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}")),
-         parameter = "full") %>% 
+         parameter = "Full with Habitat") %>% 
   select(routeF,median,sd) %>% 
   rename(abundance = median,
          abundance_se = sd)
@@ -147,7 +149,7 @@ alpha2 <- summ %>%
   filter(grepl("alpha_resid[",variable,fixed = TRUE)) %>% 
   mutate(across(2:7,~exp(.x)),
          routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}")),
-         parameter = "no habitat") %>% 
+         parameter = "Residual") %>% 
   select(routeF,median,sd) %>% 
   rename(abundance = median,
          abundance_se = sd)
@@ -159,7 +161,7 @@ betas2 <- summ %>%
   filter(grepl("beta_resid[",variable,fixed = TRUE)) %>% 
   mutate(across(2:7,~exp_t(.x)),
          routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}")),
-         parameter = "no habitat") %>% 
+         parameter = "Residual") %>% 
   select(routeF,mean,sd,parameter) %>% 
   rename(trend = mean,
          trend_se = sd)
@@ -202,10 +204,42 @@ map <- ggplot()+
                       guide = guide_legend(reverse=TRUE),
                       name = paste0(lgnd_head))+
   coord_sf(xlim = xlms,ylim = ylms)+
-  theme_bw()+
   guides(size = "none")+
+  scalebar(plot_map,
+           dist = 250,
+           dist_unit = "km",
+           transform = FALSE,
+           facet.var = "parameter",
+           facet.lev = "Full with Habitat-Change",
+           location = "bottomleft",
+           st.size = 2.5,
+           #box.fill = gray(0.7),
+           #box.color = gray(0.7),
+           st.color = gray(0.5))+
+  xlab("")+
+  ylab("")+
+  # ggspatial::annotation_north_arrow(data = base_strata_map,
+  #                                   aes(location = "tr"),
+  #                                   style = north_arrow_minimal(
+  #                                     line_width = 1,
+  #                                     line_col = gray(0.7),
+  #                                     fill = gray(0.7),
+  #                                     text_col = gray(0.5),
+  #                                     text_family = "",
+  #                                     text_face = NULL,
+  #                                     text_size = 10
+  #                                   ))+
+  north(plot_map, symbol = 3)+
   labs(title = paste(firstYear,"-",lastYear))+
+  theme_bw()+
   facet_wrap(vars(parameter))
+
+
+# map <- ggplot(plot_map)+
+#   geom_sf()+
+#   north(plot_map)
+map
+
 
 
 map_abund <- ggplot()+
@@ -219,17 +253,14 @@ map_abund <- ggplot()+
                          name = paste0("Relative Abundance"))+
   coord_sf(xlim = xlms,ylim = ylms)+
   theme_bw()+
+  xlab("")+
+  ylab("")+
+  north(plot_map, symbol = 3)+
   labs(title = paste(firstYear,"-",lastYear))+
   facet_wrap(vars(parameter))
 
 
-#map
 
-# pdf(paste0("Figures/Four_trends_model_comparison_",species_f,".pdf"),
-#     height = 8,
-#     width = 8)
-# print(map)
-# dev.off()
 
 map_se <- ggplot()+
   geom_sf(data = base_strata_map,
@@ -246,6 +277,9 @@ map_se <- ggplot()+
                          name = paste0("SE of Trend"))+
   coord_sf(xlim = xlms,ylim = ylms)+
   theme_bw()+
+  xlab("")+
+  ylab("")+
+  north(plot_map, symbol = 3)+
   guides(size = "none")+
   labs(title = paste(firstYear,"-",lastYear))+
   facet_wrap(vars(parameter))
@@ -327,7 +361,7 @@ betas1 <- summ %>%
   filter(grepl("beta[",variable,fixed = TRUE)) %>% 
   mutate(across(2:7,~exp_t(.x)),
          routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}")),
-         parameter = "full") %>% 
+         parameter = "Full with Habitat-Change") %>% 
   select(routeF,mean,sd,parameter) %>% 
   rename(trend = mean,
          trend_se = sd)
@@ -337,7 +371,7 @@ alpha1 <- summ %>%
   filter(grepl("alpha[",variable,fixed = TRUE)) %>% 
   mutate(across(2:7,~exp(.x)),
          routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}")),
-         parameter = "full") %>% 
+         parameter = "Full with Habitat") %>% 
   select(routeF,median,sd) %>% 
   rename(abundance = median,
          abundance_se = sd)
@@ -346,7 +380,7 @@ alpha2 <- summ %>%
   filter(grepl("alpha_resid[",variable,fixed = TRUE)) %>% 
   mutate(across(2:7,~exp(.x)),
          routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}")),
-         parameter = "no habitat") %>% 
+         parameter = "Residual") %>% 
   select(routeF,median,sd) %>% 
   rename(abundance = median,
          abundance_se = sd)
@@ -358,7 +392,7 @@ betas2 <- summ %>%
   filter(grepl("beta_resid[",variable,fixed = TRUE)) %>% 
   mutate(across(2:7,~exp_t(.x)),
          routeF = as.integer(str_extract(variable,"[[:digit:]]{1,}")),
-         parameter = "no habitat") %>% 
+         parameter = "Residual") %>% 
   select(routeF,mean,sd,parameter) %>% 
   rename(trend = mean,
          trend_se = sd)
@@ -402,7 +436,21 @@ map <- ggplot()+
                       name = paste0(lgnd_head))+
   coord_sf(xlim = xlms,ylim = ylms)+
   theme_bw()+
+  xlab("")+
+  ylab("")+
   guides(size = "none")+
+  scalebar(plot_map,
+           dist = 250,
+           dist_unit = "km",
+           transform = FALSE,
+           facet.var = "parameter",
+           facet.lev = "Full with Habitat-Change",
+           location = "bottomleft",
+           st.size = 2.5,
+           #box.fill = gray(0.7),
+           #box.color = gray(0.7),
+           st.color = gray(0.5))+
+  north(plot_map, symbol = 3)+
   labs(title = paste(firstYear,"-",lastYear))+
   facet_wrap(vars(parameter))
 
@@ -418,7 +466,10 @@ map_abund <- ggplot()+
                          guide = guide_legend(reverse=TRUE),
                          name = paste0("Relative Abundance"))+
   coord_sf(xlim = xlms,ylim = ylms)+
+  xlab("")+
+  ylab("")+
   theme_bw()+
+  north(plot_map, symbol = 3)+
   labs(title = paste(firstYear,"-",lastYear))+
   facet_wrap(vars(parameter))
 
@@ -445,7 +496,10 @@ map_se <- ggplot()+
                          guide = guide_legend(reverse=TRUE),
                          name = paste0("SE of Trend"))+
   coord_sf(xlim = xlms,ylim = ylms)+
+  xlab("")+
+  ylab("")+
   theme_bw()+
+  north(plot_map, symbol = 3)+
   guides(size = "none")+
   labs(title = paste(firstYear,"-",lastYear))+
   facet_wrap(vars(parameter))
@@ -533,7 +587,6 @@ hypers_out <- bind_rows(hypers_out,TT)
 
 saveRDS(hypers_out,"saved_hyperparameters.rds")
 saveRDS(route_params_out,"saved_route_parameters.rds")
-
 
 
 
