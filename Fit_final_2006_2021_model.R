@@ -6,8 +6,8 @@ library(tidyverse)
 library(cmdstanr)
 library(patchwork)
 library(sf)
-library(ggsn) #scale bars and north arrow
-
+library(ggsn) #scale bars
+library(rnaturalearth)
 
 
 
@@ -190,6 +190,18 @@ map_palette <- c("#a50026", "#d73027", "#f46d43", "#fdae61", "#fee090", "#ffffbf
 names(map_palette) <- labls
 
 
+scbar <- scalebar(plot_map,
+                  dist = 300,
+                  dist_unit = "km",
+                  transform = FALSE,
+                  facet.var = "parameter",
+                  facet.lev = "Full with Habitat-Change",
+                  location = "bottomleft",
+                  st.size = 2.5,
+                  box.fill = c(gray(0.5),"white"),
+                  box.color = gray(0.3),
+                  st.color = gray(0.5))
+
 
 map <- ggplot()+
   geom_sf(data = base_strata_map,
@@ -205,17 +217,17 @@ map <- ggplot()+
                       name = paste0(lgnd_head))+
   coord_sf(xlim = xlms,ylim = ylms)+
   guides(size = "none")+
-  scalebar(plot_map,
-           dist = 250,
-           dist_unit = "km",
-           transform = FALSE,
-           facet.var = "parameter",
-           facet.lev = "Full with Habitat-Change",
-           location = "bottomleft",
-           st.size = 2.5,
-           #box.fill = gray(0.7),
-           #box.color = gray(0.7),
-           st.color = gray(0.5))+
+  # scalebar(plot_map,
+  #          dist = 300,
+  #          dist_unit = "km",
+  #          transform = FALSE,
+  #          facet.var = "parameter",
+  #          facet.lev = "Full with Habitat-Change",
+  #          location = "bottomleft",
+  #          st.size = 2.5,
+  #          box.fill = c(gray(0.5),"white"),
+  #          box.color = gray(0.3),
+  #          st.color = gray(0.5))+
   xlab("")+
   ylab("")+
   # ggspatial::annotation_north_arrow(data = base_strata_map,
@@ -229,17 +241,20 @@ map <- ggplot()+
   #                                     text_face = NULL,
   #                                     text_size = 10
   #                                   ))+
-  north(plot_map, symbol = 3)+
-  labs(title = paste(firstYear,"-",lastYear))+
+  # north(symbol = 1, location = "topright",
+  #       anchor = c(x = -123,y = 61),
+  #       x.min = -124,
+  #       x.max = -122,
+  #       y.min = 60,
+  #       y.max = 62)+
+  labs(title = "Trend")+
   theme_bw()+
   facet_wrap(vars(parameter))
 
 
-# map <- ggplot(plot_map)+
-#   geom_sf()+
-#   north(plot_map)
-map
+map <- map + scbar
 
+map
 
 
 map_abund <- ggplot()+
@@ -255,8 +270,8 @@ map_abund <- ggplot()+
   theme_bw()+
   xlab("")+
   ylab("")+
-  north(plot_map, symbol = 3)+
-  labs(title = paste(firstYear,"-",lastYear))+
+ # north(plot_map, symbol = 3)+
+  labs(title = "Relative Abundance")+
   facet_wrap(vars(parameter))
 
 
@@ -279,9 +294,9 @@ map_se <- ggplot()+
   theme_bw()+
   xlab("")+
   ylab("")+
-  north(plot_map, symbol = 3)+
+ # north(plot_map, symbol = 3)+
   guides(size = "none")+
-  labs(title = paste(firstYear,"-",lastYear))+
+  labs(title = "")+
   facet_wrap(vars(parameter))
 
 
@@ -299,7 +314,62 @@ print(map / map_se + plot_layout(guides = "collect"))
 
 dev.off()
 
-map_save <- map / map_abund + plot_layout(guides = "collect")
+sa_box <- sf::st_bbox(st_buffer(plot_map,
+                                dist = 100000)) %>% 
+  st_as_sfc()
+
+plot_lims <- bbsBayes2::load_map("prov_state") %>% 
+  filter(strata_name != "AK") %>% 
+  st_bbox()
+
+xlims <- plot_lims[c("xmin","xmax")]
+ylims <- plot_lims[c("ymin","ymax")]
+
+
+NA_inset <- ne_states(country = c("Canada",
+                                    "United States of America",
+                                    "Mexico"),
+                      returnclass = "sf") %>%
+  # NA_inset <- ne_states(continent = "North America",
+#                          returnclass = "sf",
+#                     scale = 110) %>% 
+  st_transform(.,crs = st_crs(plot_map))
+  
+
+
+NA_inset_map <- ggplot()+
+  geom_sf(data = NA_inset,
+          fill = NA)+
+  geom_sf(data = sa_box,
+          fill = NA,
+          linewidth = 1)+
+  coord_sf(xlim = xlims,
+           ylim = ylims)+
+  theme_bw()
+
+NA_inset_map
+saveRDS(NA_inset_map,"Figures/Inset.rds")
+pdf("Figures/inset.pdf",
+    width = 2.5,
+    height = 2.5)
+print(NA_inset_map)
+dev.off()
+
+png("Figures/inset.png",
+    res = 144)#
+print(NA_inset_map)
+dev.off()
+
+
+map_save <- map/ map_abund + 
+   plot_layout(guides = "collect") #+
+  # inset_element(NA_inset, left = 0.8, right = 1,
+  #               top = 1,bottom = 0.8,
+  #               clip = FALSE,
+  #               on_top = TRUE,
+  #               align_to = "full")
+
+map_save
 saveRDS(map_save,paste0("Figures/saved_map_",firstYear,".rds"))
 
 pdf(paste0("Figures/Figure_4both.pdf"),
@@ -314,6 +384,9 @@ dev.off()
 
   
   
+
+# 1985 trends -------------------------------------------------------------
+
   
 
 
@@ -409,7 +482,7 @@ plot_map <- route_map_2006 %>%
             multiple = "all") 
 
 breaks <- c(-7, -4, -2, -1, -0.5, 0.5, 1, 2, 4, 7)
-lgnd_head <- "Mean Trend\n"
+lgnd_head <- paste("Mean Trend\n")#,firstYear,"-",lastYear)
 trend_title <- "Mean Trend"
 labls = c(paste0("< ",breaks[1]),paste0(breaks[-c(length(breaks))],":", breaks[-c(1)]),paste0("> ",breaks[length(breaks)]))
 labls = paste0(labls, " %/year")
@@ -439,22 +512,22 @@ map <- ggplot()+
   xlab("")+
   ylab("")+
   guides(size = "none")+
-  scalebar(plot_map,
-           dist = 250,
-           dist_unit = "km",
-           transform = FALSE,
-           facet.var = "parameter",
-           facet.lev = "Full with Habitat-Change",
-           location = "bottomleft",
-           st.size = 2.5,
-           #box.fill = gray(0.7),
-           #box.color = gray(0.7),
-           st.color = gray(0.5))+
-  north(plot_map, symbol = 3)+
-  labs(title = paste(firstYear,"-",lastYear))+
+  # scalebar(plot_map,
+  #          dist = 250,
+  #          dist_unit = "km",
+  #          transform = FALSE,
+  #          facet.var = "parameter",
+  #          facet.lev = "Full with Habitat-Change",
+  #          location = "bottomleft",
+  #          st.size = 2.5,
+  #          #box.fill = gray(0.7),
+  #          #box.color = gray(0.7),
+  #          st.color = gray(0.5))+
+  #north(plot_map, symbol = 3)+
+  labs(title = "Trend")+
   facet_wrap(vars(parameter))
 
-
+map <- map+scbar
 
 map_abund <- ggplot()+
   geom_sf(data = base_strata_map,
@@ -469,8 +542,8 @@ map_abund <- ggplot()+
   xlab("")+
   ylab("")+
   theme_bw()+
-  north(plot_map, symbol = 3)+
-  labs(title = paste(firstYear,"-",lastYear))+
+  #north(plot_map, symbol = 3)+
+  labs(title = "Relative Abundance")+
   facet_wrap(vars(parameter))
 
 
@@ -499,9 +572,9 @@ map_se <- ggplot()+
   xlab("")+
   ylab("")+
   theme_bw()+
-  north(plot_map, symbol = 3)+
+  #north(plot_map, symbol = 3)+
   guides(size = "none")+
-  labs(title = paste(firstYear,"-",lastYear))+
+  #labs(title = paste(firstYear,"-",lastYear))+
   facet_wrap(vars(parameter))
 
 
